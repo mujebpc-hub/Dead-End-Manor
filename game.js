@@ -5,6 +5,18 @@ let move = { w:false, a:false, s:false, d:false };
 let yaw = 0;
 let pitch = 0;
 
+// ✅ FIX: START GAME FUNCTION (missing before)
+function startGame() {
+  document.getElementById("home").style.display = "none";
+  document.getElementById("loading").style.display = "flex";
+
+  setTimeout(() => {
+    document.getElementById("loading").style.display = "none";
+    document.getElementById("menu").style.display = "flex";
+  }, 1500);
+}
+
+// ENTER GAME
 function enterGame() {
   document.getElementById("menu").style.display = "none";
   init();
@@ -14,7 +26,7 @@ function enterGame() {
 function init() {
   scene = new THREE.Scene();
 
-  // 🌌 BLUE SKY
+  // 🌌 SKY BLUE
   scene.background = new THREE.Color(0x87ceeb);
 
   camera = new THREE.PerspectiveCamera(
@@ -28,7 +40,7 @@ function init() {
   renderer.setSize(window.innerWidth, window.innerHeight);
   document.body.appendChild(renderer.domElement);
 
-  // 💡 LIGHT
+  // LIGHT
   scene.add(new THREE.AmbientLight(0xffffff, 0.6));
 
   const light = new THREE.DirectionalLight(0xffffff, 1);
@@ -51,7 +63,7 @@ function init() {
   house.position.set(0, 5, -25);
   scene.add(house);
 
-  // 👤 PLAYER
+  // PLAYER
   player = new THREE.Object3D();
   player.position.set(0, 2, 5);
   scene.add(player);
