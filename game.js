@@ -36,6 +36,58 @@ function init() {
     1000
   );
 
+// 🌱 FLOOR
+const floor = new THREE.Mesh(
+  new THREE.PlaneGeometry(30, 30),
+  new THREE.MeshStandardMaterial({ color: 0xffffff })
+);
+floor.rotation.x = -Math.PI / 2;
+floor.position.set(0, 0, -25);
+scene.add(floor);
+
+// 🧱 WALLS
+const wallMat = new THREE.MeshStandardMaterial({ color: 0xdddddd });
+
+// BACK WALL
+const backWall = new THREE.Mesh(
+  new THREE.BoxGeometry(30, 6, 1),
+  wallMat
+);
+backWall.position.set(0, 3, -40);
+scene.add(backWall);
+
+// FRONT WALL
+const frontWall = new THREE.Mesh(
+  new THREE.BoxGeometry(30, 6, 1),
+  wallMat
+);
+frontWall.position.set(0, 3, -10);
+scene.add(frontWall);
+
+// LEFT WALL
+const leftWall = new THREE.Mesh(
+  new THREE.BoxGeometry(1, 6, 30),
+  wallMat
+);
+leftWall.position.set(-15, 3, -25);
+scene.add(leftWall);
+
+// RIGHT WALL
+const rightWall = new THREE.Mesh(
+  new THREE.BoxGeometry(1, 6, 30),
+  wallMat
+);
+rightWall.position.set(15, 3, -25);
+scene.add(rightWall);
+
+// 🚪 DOOR
+const door = new THREE.Mesh(
+  new THREE.BoxGeometry(3, 5, 0.5),
+  new THREE.MeshStandardMaterial({ color: 0x333333 })
+);
+door.position.set(0, 2.5, -10.2);
+scene.add(door);
+  
   renderer = new THREE.WebGLRenderer({ antialias: true });
   renderer.setSize(window.innerWidth, window.innerHeight);
   document.body.appendChild(renderer.domElement);
