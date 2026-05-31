@@ -1,197 +1,41 @@
 <!DOCTYPE html>
-
 <html>
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>The Watcher</title>
-
-<style>
-*{
-margin:0;
-padding:0;
-box-sizing:border-box;
-font-family:Arial,sans-serif;
-}
-
-body{
-height:100vh;
-background:#000;
-display:flex;
-justify-content:center;
-align-items:center;
-color:white;
-overflow:hidden;
-}
-
-#menu,
-#loading,
-#mainMenu{
-text-align:center;
-}
-
-h1{
-font-size:70px;
-margin-bottom:15px;
-}
-
-button{
-padding:15px 40px;
-font-size:22px;
-cursor:pointer;
-border:none;
-border-radius:8px;
-}
-
-button:hover{
-transform:scale(1.05);
-}
-
-#loading{
-display:none;
-width:80%;
-max-width:500px;
-}
-
-#mainMenu{
-display:none;
-}
-
-.bar{
-width:100%;
-height:25px;
-background:#222;
-border-radius:20px;
-overflow:hidden;
-margin-top:20px;
-}
-
-.progress{
-width:0%;
-height:100%;
-background:white;
-}
-</style>
-
+<link rel="stylesheet" href="style.css">
 </head>
 
 <body>
 
-<!-- HOME SCREEN -->
-
+<!-- HOME MENU -->
 <div id="menu">
-<h1>THE WATCHER</h1>
-<p>Hide. Survive. Escape.</p>
-<br>
-<button onclick="startGame()">PLAY NOW</button>
+  <h1>THE WATCHER</h1>
+  <p>Hide. Survive. Escape.</p>
+  <button onclick="startGame()">PLAY NOW</button>
 </div>
 
-<!-- LOADING SCREEN -->
-
+<!-- LOADING -->
 <div id="loading">
-<h2>Entering The Facility...</h2>
-
-<div class="bar">
-<div class="progress" id="progress"></div>
-</div>
+  <h2>Entering The Facility...</h2>
+  <div class="bar">
+    <div class="progress" id="progress"></div>
+  </div>
 </div>
 
 <!-- MAIN MENU -->
-
 <div id="mainMenu">
-<h1>THE WATCHER</h1>
+  <h1>THE WATCHER</h1>
 
-<button onclick="newGame()">NEW GAME</button> <br><br>
-
-<button onclick="alert('Settings Coming Soon')">
-SETTINGS
-</button>
-
-<br><br>
-
-<button onclick="alert('Created By You')">
-CREDITS
-</button>
+  <button onclick="newGame()">NEW GAME</button><br><br>
+  <button onclick="alert('Settings Coming Soon')">SETTINGS</button><br><br>
+  <button onclick="alert('Created By You')">CREDITS</button>
 </div>
 
-<script>
+<!-- GAME SCREEN -->
+<div id="game"></div>
 
-function startGame(){
-
-document.getElementById("menu").style.display="none";
-document.getElementById("loading").style.display="block";
-
-let progress=0;
-
-let interval=setInterval(()=>{
-
-progress+=2;
-
-document.getElementById("progress").style.width=progress+"%";
-
-if(progress>=100){
-
-clearInterval(interval);
-
-setTimeout(()=>{
-
-document.getElementById("loading").style.display="none";
-document.getElementById("mainMenu").style.display="block";
-
-},500);
-
-}
-
-},60);
-
-}
-
-function newGame(){
-
-document.getElementById("mainMenu").innerHTML = `
-
-<h1>DAY 1</h1>
-
-<p>You wake up near Dead-End Manor.</p>
-
-<br><br>
-
-<button onclick="startScene()">
-START
-</button>
-
-`;
-
-}
-
-function startScene(){
-
-document.body.innerHTML = `
-
-<div style="
-text-align:center;
-color:white;
-">
-
-<h1>FIRST GAME SCENE</h1>
-
-<p>
-You are standing outside Dead-End Manor.
-</p>
-
-<br>
-
-<button onclick="alert('3D Gameplay Coming Next')">
-ENTER MANOR
-</button>
-
-</div>
-
-`;
-
-}
-
-</script>
-  
+<script src="game.js"></script>
 </body>
 </html>
