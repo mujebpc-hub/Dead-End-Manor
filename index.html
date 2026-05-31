@@ -1,41 +1,24 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>The Watcher</title>
-<link rel="stylesheet" href="style.css">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dead-End Manor</title>
+    <link rel="stylesheet" href="style.css">
+    <!-- Three.js लाइब्रेरी लोड कर रहे हैं -->
+    <script src="https://cloudflare.com"></script>
 </head>
-
 <body>
+    <!-- गेम शुरू करने की स्क्रीन -->
+    <div id="ui-container">
+        <h1>Dead-End Manor</h1>
+        <p>Granny से बचें और घर से बाहर निकलें!</p>
+        <button id="start-btn">खेल शुरू करें</button>
+    </div>
 
-<!-- HOME MENU -->
-<div id="menu">
-  <h1>THE WATCHER</h1>
-  <p>Hide. Survive. Escape.</p>
-  <button onclick="startGame()">PLAY NOW</button>
-</div>
+    <!-- 3D गेम इसी कंटेनर में दिखेगा -->
+    <div id="game-container"></div>
 
-<!-- LOADING -->
-<div id="loading">
-  <h2>Entering The Facility...</h2>
-  <div class="bar">
-    <div class="progress" id="progress"></div>
-  </div>
-</div>
-
-<!-- MAIN MENU -->
-<div id="mainMenu">
-  <h1>THE WATCHER</h1>
-
-  <button onclick="newGame()">NEW GAME</button><br><br>
-  <button onclick="alert('Settings Coming Soon')">SETTINGS</button><br><br>
-  <button onclick="alert('Created By You')">CREDITS</button>
-</div>
-
-<!-- GAME SCREEN -->
-<div id="game"></div>
-
-<script src="game.js"></script>
+    <script src="game.js"></script>
 </body>
 </html>
