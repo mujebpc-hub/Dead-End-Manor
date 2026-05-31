@@ -1,1 +1,64 @@
+body {
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  font-family: Arial, sans-serif;
+}
 
+/* 🎮 HOME / MENU SCREEN */
+#home, #menu, #loading {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  background: radial-gradient(circle, #000000, #0b0f14);
+  color: white;
+
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+}
+
+/* 🎮 TITLE */
+h1, h2 {
+  margin: 10px;
+  letter-spacing: 3px;
+}
+
+/* 🔘 BUTTON STYLE */
+button {
+  padding: 12px 25px;
+  font-size: 18px;
+  border: none;
+  cursor: pointer;
+  margin-top: 15px;
+
+  background: #ffffff;
+  color: #000;
+  border-radius: 6px;
+
+  transition: 0.3s;
+}
+
+button:hover {
+  background: #00ff99;
+  color: #000;
+  transform: scale(1.05);
+}
+
+/* ⏳ LOADING TEXT */
+#loading h2 {
+  animation: blink 1s infinite;
+}
+
+@keyframes blink {
+  0% { opacity: 1; }
+  50% { opacity: 0.3; }
+  100% { opacity: 1; }
+}
+
+/* 🎯 CANVAS (3D GAME SCREEN) */
+canvas {
+  display: block;
+}
