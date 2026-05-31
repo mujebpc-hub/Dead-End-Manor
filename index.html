@@ -24,7 +24,9 @@ color:white;
 overflow:hidden;
 }
 
-#menu{
+#menu,
+#loading,
+#mainMenu{
 text-align:center;
 }
 
@@ -41,11 +43,18 @@ border:none;
 border-radius:8px;
 }
 
+button:hover{
+transform:scale(1.05);
+}
+
 #loading{
 display:none;
-text-align:center;
 width:80%;
 max-width:500px;
+}
+
+#mainMenu{
+display:none;
 }
 
 .bar{
@@ -68,6 +77,8 @@ background:white;
 
 <body>
 
+<!-- HOME SCREEN -->
+
 <div id="menu">
 <h1>THE WATCHER</h1>
 <p>Hide. Survive. Escape.</p>
@@ -75,12 +86,32 @@ background:white;
 <button onclick="startGame()">PLAY NOW</button>
 </div>
 
+<!-- LOADING SCREEN -->
+
 <div id="loading">
 <h2>Entering The Facility...</h2>
 
 <div class="bar">
 <div class="progress" id="progress"></div>
 </div>
+</div>
+
+<!-- MAIN MENU -->
+
+<div id="mainMenu">
+<h1>THE WATCHER</h1>
+
+<button onclick="newGame()">NEW GAME</button> <br><br>
+
+<button onclick="alert('Settings Coming Soon')">
+SETTINGS
+</button>
+
+<br><br>
+
+<button onclick="alert('Created By You')">
+CREDITS
+</button>
 </div>
 
 <script>
@@ -103,12 +134,60 @@ if(progress>=100){
 clearInterval(interval);
 
 setTimeout(()=>{
-alert("Game Coming Soon");
+
+document.getElementById("loading").style.display="none";
+document.getElementById("mainMenu").style.display="block";
+
 },500);
 
 }
 
 },60);
+
+}
+
+function newGame(){
+
+document.getElementById("mainMenu").innerHTML = `
+
+<h1>DAY 1</h1>
+
+<p>You wake up near Dead-End Manor.</p>
+
+<br><br>
+
+<button onclick="startScene()">
+START
+</button>
+
+`;
+
+}
+
+function startScene(){
+
+document.body.innerHTML = `
+
+<div style="
+text-align:center;
+color:white;
+">
+
+<h1>FIRST GAME SCENE</h1>
+
+<p>
+You are standing outside Dead-End Manor.
+</p>
+
+<br>
+
+<button onclick="alert('3D Gameplay Coming Next')">
+ENTER MANOR
+</button>
+
+</div>
+
+`;
 
 }
 
