@@ -13,55 +13,63 @@ function enterGame() {
 
 function init() {
   scene = new THREE.Scene();
-  scene.background = new THREE.Color(0x0b0f14);
 
-  camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 1000);
+  // 🌌 BLUE SKY
+  scene.background = new THREE.Color(0x87ceeb);
 
-  renderer = new THREE.WebGLRenderer();
+  camera = new THREE.PerspectiveCamera(
+    75,
+    window.innerWidth / window.innerHeight,
+    0.1,
+    1000
+  );
+
+  renderer = new THREE.WebGLRenderer({ antialias: true });
   renderer.setSize(window.innerWidth, window.innerHeight);
   document.body.appendChild(renderer.domElement);
 
-  // LIGHT
-  scene.add(new THREE.AmbientLight(0xffffff, 0.5));
+  // 💡 LIGHT
+  scene.add(new THREE.AmbientLight(0xffffff, 0.6));
+
   const light = new THREE.DirectionalLight(0xffffff, 1);
-  light.position.set(5,10,5);
+  light.position.set(5, 10, 5);
   scene.add(light);
 
-  // GROUND
+  // 🌱 GREEN LAND
   const ground = new THREE.Mesh(
-    new THREE.PlaneGeometry(200,200),
-    new THREE.MeshStandardMaterial({ color:0x1a1a1a })
+    new THREE.PlaneGeometry(200, 200),
+    new THREE.MeshStandardMaterial({ color: 0x2ecc71 })
   );
-  ground.rotation.x = -Math.PI/2;
+  ground.rotation.x = -Math.PI / 2;
   scene.add(ground);
 
-  // HOUSE (gray box you see = mansion)
+  // 🏠 WHITE HOUSE
   const house = new THREE.Mesh(
-    new THREE.BoxGeometry(12,10,12),
-    new THREE.MeshStandardMaterial({ color:0x555555 })
+    new THREE.BoxGeometry(12, 10, 12),
+    new THREE.MeshStandardMaterial({ color: 0xffffff })
   );
-  house.position.set(0,5,-25);
+  house.position.set(0, 5, -25);
   scene.add(house);
 
-  // PLAYER
+  // 👤 PLAYER
   player = new THREE.Object3D();
-  player.position.set(0,2,5);
+  player.position.set(0, 2, 5);
   scene.add(player);
   player.add(camera);
 
-  camera.position.set(0,1.6,0);
+  camera.position.set(0, 1.6, 0);
 
   // CONTROLS
   window.addEventListener("keydown", keyDown);
   window.addEventListener("keyup", keyUp);
 
-  // MOUSE LOOK (IMPORTANT)
+  // MOUSE LOOK
   document.addEventListener("click", () => {
     document.body.requestPointerLock();
   });
 
   document.addEventListener("mousemove", (e) => {
-    if(document.pointerLockElement === document.body){
+    if (document.pointerLockElement === document.body) {
       yaw -= e.movementX * 0.002;
       pitch -= e.movementY * 0.002;
 
@@ -89,12 +97,11 @@ function animate(){
 
   let speed = 0.2;
 
-  // forward direction based on camera yaw
   let forwardX = Math.sin(yaw);
   let forwardZ = Math.cos(yaw);
 
-  let rightX = Math.sin(yaw + Math.PI/2);
-  let rightZ = Math.cos(yaw + Math.PI/2);
+  let rightX = Math.sin(yaw + Math.PI / 2);
+  let rightZ = Math.cos(yaw + Math.PI / 2);
 
   if(move.w){
     player.position.x -= forwardX * speed;
