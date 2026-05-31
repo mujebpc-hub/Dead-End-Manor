@@ -2,15 +2,8 @@ let scene, camera, renderer;
 let player;
 let move = { w:false, a:false, s:false, d:false };
 
-function startGame() {
-  document.getElementById("home").style.display = "none";
-  document.getElementById("loading").style.display = "flex";
-
-  setTimeout(() => {
-    document.getElementById("loading").style.display = "none";
-    document.getElementById("menu").style.display = "flex";
-  }, 2000);
-}
+let yaw = 0;
+let pitch = 0;
 
 function enterGame() {
   document.getElementById("menu").style.display = "none";
@@ -20,41 +13,61 @@ function enterGame() {
 
 function init() {
   scene = new THREE.Scene();
-  scene.background = new THREE.Color(0x111111);
+  scene.background = new THREE.Color(0x0b0f14);
 
   camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 1000);
-  camera.position.set(0, 2, 5);
 
   renderer = new THREE.WebGLRenderer();
   renderer.setSize(window.innerWidth, window.innerHeight);
   document.body.appendChild(renderer.domElement);
 
   // LIGHT
+  scene.add(new THREE.AmbientLight(0xffffff, 0.5));
   const light = new THREE.DirectionalLight(0xffffff, 1);
   light.position.set(5,10,5);
   scene.add(light);
 
   // GROUND
-  const groundGeo = new THREE.PlaneGeometry(50,50);
-  const groundMat = new THREE.MeshStandardMaterial({ color:0x222222 });
-  const ground = new THREE.Mesh(groundGeo, groundMat);
+  const ground = new THREE.Mesh(
+    new THREE.PlaneGeometry(200,200),
+    new THREE.MeshStandardMaterial({ color:0x1a1a1a })
+  );
   ground.rotation.x = -Math.PI/2;
   scene.add(ground);
 
-  // MANSION (simple box)
-  const houseGeo = new THREE.BoxGeometry(5,5,5);
-  const houseMat = new THREE.MeshStandardMaterial({ color:0x555555 });
-  const house = new THREE.Mesh(houseGeo, houseMat);
-  house.position.set(0,2.5,-10);
+  // HOUSE (gray box you see = mansion)
+  const house = new THREE.Mesh(
+    new THREE.BoxGeometry(12,10,12),
+    new THREE.MeshStandardMaterial({ color:0x555555 })
+  );
+  house.position.set(0,5,-25);
   scene.add(house);
 
-  // PLAYER (invisible controller)
+  // PLAYER
   player = new THREE.Object3D();
+  player.position.set(0,2,5);
   scene.add(player);
   player.add(camera);
 
+  camera.position.set(0,1.6,0);
+
+  // CONTROLS
   window.addEventListener("keydown", keyDown);
   window.addEventListener("keyup", keyUp);
+
+  // MOUSE LOOK (IMPORTANT)
+  document.addEventListener("click", () => {
+    document.body.requestPointerLock();
+  });
+
+  document.addEventListener("mousemove", (e) => {
+    if(document.pointerLockElement === document.body){
+      yaw -= e.movementX * 0.002;
+      pitch -= e.movementY * 0.002;
+
+      pitch = Math.max(-1.5, Math.min(1.5, pitch));
+    }
+  });
 }
 
 function keyDown(e){
@@ -74,12 +87,34 @@ function keyUp(e){
 function animate(){
   requestAnimationFrame(animate);
 
-  let speed = 0.1;
+  let speed = 0.2;
 
-  if(move.w) player.position.z -= speed;
-  if(move.s) player.position.z += speed;
-  if(move.a) player.position.x -= speed;
-  if(move.d) player.position.x += speed;
+  // forward direction based on camera yaw
+  let forwardX = Math.sin(yaw);
+  let forwardZ = Math.cos(yaw);
+
+  let rightX = Math.sin(yaw + Math.PI/2);
+  let rightZ = Math.cos(yaw + Math.PI/2);
+
+  if(move.w){
+    player.position.x -= forwardX * speed;
+    player.position.z -= forwardZ * speed;
+  }
+  if(move.s){
+    player.position.x += forwardX * speed;
+    player.position.z += forwardZ * speed;
+  }
+  if(move.a){
+    player.position.x -= rightX * speed;
+    player.position.z -= rightZ * speed;
+  }
+  if(move.d){
+    player.position.x += rightX * speed;
+    player.position.z += rightZ * speed;
+  }
+
+  player.rotation.y = yaw;
+  camera.rotation.x = pitch;
 
   renderer.render(scene, camera);
 }
