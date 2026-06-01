@@ -1,11 +1,3 @@
-हाँ, code में main गलती ये है:
-
-grass variable define नहीं है, इसलिए tree leaves crash करेंगे.
-joy.style.cssText = position:absolute... में CSS string quotes में नहीं है, इससे syntax error आएगा.
-river और rocks वाला code init()/createTerrain() के बाहर है, इसलिए scene undefined हो सकता है.
-अगर enterGame() दो बार चला तो renderer/control duplicate हो सकते हैं.
-नीचे corrected game.js paste कर दो:
-
 let scene, camera, renderer;
 let player;
 let gameStarted = false;
