@@ -46,6 +46,15 @@ function enterGame(){
 
 function createTree(x,z){
 
+  const loader = new THREE.TextureLoader();
+
+const grass = loader.load("grass.jpg");
+
+grass.wrapS = THREE.RepeatWrapping;
+grass.wrapT = THREE.RepeatWrapping;
+
+grass.repeat.set(40,40);
+
   const trunk = new THREE.Mesh(
     new THREE.CylinderGeometry(0.5,0.5,5),
     new THREE.MeshStandardMaterial({
