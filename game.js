@@ -239,6 +239,16 @@ function init(){
     antialias:true
   });
 
+renderer.setPixelRatio(window.devicePixelRatio);
+
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+
+renderer.toneMapping =
+THREE.ACESFilmicToneMapping;
+
+renderer.toneMappingExposure = 1.2;
+  
   renderer.setSize(
     window.innerWidth,
     window.innerHeight
