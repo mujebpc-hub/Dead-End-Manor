@@ -273,23 +273,23 @@ renderer.toneMappingExposure = 1.2;
     )
   );
 
- const sun = new THREE.DirectionalLight(
-  0xffffff,
-  2.5
+ const moon = new THREE.DirectionalLight(
+  0xaaccff,
+  0.7
 );
 
-sun.castShadow = true;
+moon.castShadow = true;
 
-sun.shadow.mapSize.width = 2048;
-sun.shadow.mapSize.height = 2048;
+moon.shadow.mapSize.width = 2048;
+moon.shadow.mapSize.height = 2048;
 
-  sun.position.set(
-    100,
-    150,
-    50
-  );
+moon.position.set(
+  50,
+  80,
+  -50
+);
 
-  scene.add(sun);
+scene.add(moon);
 
   // MAP
 
