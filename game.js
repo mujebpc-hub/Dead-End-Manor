@@ -68,8 +68,8 @@ grass.repeat.set(40,40);
   const leaves = new THREE.Mesh(
     new THREE.ConeGeometry(3,6,8),
     new THREE.MeshStandardMaterial({
-      color:0x1e7d1e
-    })
+  map: grass
+})
   );
 
   leaves.position.set(x,7,z);
