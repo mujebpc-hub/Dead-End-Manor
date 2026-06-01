@@ -56,9 +56,21 @@ function createTree(x, z) {
 }
 
 function createTerrain() {
+
+  const loader = new THREE.TextureLoader();
+
+  const grass = loader.load("textures/grass.jpg");
+
+  grass.wrapS = THREE.RepeatWrapping;
+  grass.wrapT = THREE.RepeatWrapping;
+
+  grass.repeat.set(40,40);
+
   const ground = new THREE.Mesh(
     new THREE.PlaneGeometry(500, 500, 100, 100),
-    new THREE.MeshStandardMaterial({ color: 0x2f8f2f })
+    new THREE.MeshStandardMaterial({
+      map: grass
+    })
   );
   ground.rotation.x = -Math.PI / 2;
   scene.add(ground);
