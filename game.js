@@ -267,10 +267,15 @@ renderer.toneMappingExposure = 1.2;
     )
   );
 
-  const sun = new THREE.DirectionalLight(
-    0xffffff,
-    1
-  );
+ const sun = new THREE.DirectionalLight(
+  0xffffff,
+  2.5
+);
+
+sun.castShadow = true;
+
+sun.shadow.mapSize.width = 2048;
+sun.shadow.mapSize.height = 2048;
 
   sun.position.set(
     100,
