@@ -6,210 +6,488 @@ let move = { w:false, a:false, s:false, d:false };
 let yaw = 0;
 let pitch = 0;
 
-/* 📱 MOBILE CONTROL */
-let joystick = { active:false, dx:0, dy:0 };
+let joystick = {
+  active:false,
+  dx:0,
+  dy:0
+};
+
+let velocityY = 0;
+let isJumping = false;
 
 /* =========================
    UI FLOW
 ========================= */
 
 function startGame() {
+
   document.getElementById("home").style.display = "none";
   document.getElementById("loading").style.display = "flex";
 
   setTimeout(() => {
+
     document.getElementById("loading").style.display = "none";
     document.getElementById("menu").style.display = "flex";
-  }, 1500);
+
+  },1500);
 }
 
-function enterGame() {
+function enterGame(){
+
   document.getElementById("menu").style.display = "none";
+
   init();
   animate();
 }
 
 /* =========================
-   TERRAIN (OPEN WORLD)
+   TREE
 ========================= */
 
-function createTerrain() {
+function createTree(x,z){
+
+  const trunk = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.5,0.5,5),
+    new THREE.MeshStandardMaterial({
+      color:0x6b4423
+    })
+  );
+
+  trunk.position.set(x,2.5,z);
+  scene.add(trunk);
+
+  const leaves = new THREE.Mesh(
+    new THREE.ConeGeometry(3,6,8),
+    new THREE.MeshStandardMaterial({
+      color:0x1e7d1e
+    })
+  );
+
+  leaves.position.set(x,7,z);
+  scene.add(leaves);
+}
+
+/* =========================
+   TERRAIN
+========================= */
+
+function createTerrain(){
 
   const ground = new THREE.Mesh(
-    new THREE.BoxGeometry(300, 2, 300),
-    new THREE.MeshStandardMaterial({ color: 0x1f8f3a })
+
+    new THREE.PlaneGeometry(
+      500,
+      500,
+      100,
+      100
+    ),
+
+    new THREE.MeshStandardMaterial({
+      color:0x2f8f2f
+    })
+
   );
-  ground.position.set(0, -1, -100);
+
+  ground.rotation.x = -Math.PI/2;
   scene.add(ground);
 
-  // ⛰️ HILLS
+  // ROAD
+
+  const road = new THREE.Mesh(
+
+    new THREE.BoxGeometry(
+      12,
+      0.2,
+      250
+    ),
+
+    new THREE.MeshStandardMaterial({
+      color:0x555555
+    })
+
+  );
+
+  road.position.set(
+    0,
+    0.1,
+    -120
+  );
+
+  scene.add(road);
+
+  // HILLS
+
   const hills = [
-    [-50,5,-120,30,12],
-    [60,8,-160,40,18],
-    [20,4,-60,25,10]
+
+    [-50,6,-120,30,12],
+    [60,8,-180,40,18],
+    [20,4,-60,25,10],
+    [-90,5,-200,35,15]
+
   ];
 
   hills.forEach(h=>{
+
     const hill = new THREE.Mesh(
-      new THREE.BoxGeometry(h[3], h[4], h[3]),
-      new THREE.MeshStandardMaterial({ color: 0x2ecc71 })
+
+      new THREE.BoxGeometry(
+        h[3],
+        h[4],
+        h[3]
+      ),
+
+      new THREE.MeshStandardMaterial({
+        color:0x3cbf4a
+      })
+
     );
-    hill.position.set(h[0],h[1],h[2]);
+
+    hill.position.set(
+      h[0],
+      h[1],
+      h[2]
+    );
+
     scene.add(hill);
   });
 
-  // 🌳 TREES
-  for(let i=0;i<25;i++){
-    const tree = new THREE.Mesh(
-      new THREE.BoxGeometry(2,8,2),
-      new THREE.MeshStandardMaterial({ color: 0x145a32 })
-    );
+  // FOREST
 
-    tree.position.set(
-      (Math.random()*200)-100,
-      4,
-      (Math.random()*-200)
-    );
+  for(let i=0;i<120;i++){
 
-    scene.add(tree);
+    createTree(
+
+      (Math.random()*450)-225,
+
+      (Math.random()*-450)
+
+    );
   }
 
-  // 🏚️ HOUSE
-  const house = new THREE.Mesh(
-    new THREE.BoxGeometry(20,12,20),
-    new THREE.MeshStandardMaterial({ color: 0xdddddd })
+  // MAIN MANSION
+
+  const mansion = new THREE.Mesh(
+
+    new THREE.BoxGeometry(
+      35,
+      18,
+      35
+    ),
+
+    new THREE.MeshStandardMaterial({
+      color:0xe5e5e5
+    })
+
   );
-  house.position.set(0,6,-130);
-  scene.add(house);
+
+  mansion.position.set(
+    0,
+    9,
+    -250
+  );
+
+  scene.add(mansion);
+
+  // DOOR
 
   const door = new THREE.Mesh(
-    new THREE.BoxGeometry(4,6,1),
-    new THREE.MeshStandardMaterial({ color: 0x333333 })
+
+    new THREE.BoxGeometry(
+      5,
+      8,
+      1
+    ),
+
+    new THREE.MeshStandardMaterial({
+      color:0x333333
+    })
+
   );
-  door.position.set(0,3,-120);
+
+  door.position.set(
+    0,
+    4,
+    -232
+  );
+
   scene.add(door);
 }
-
 /* =========================
    INIT
 ========================= */
 
-function init() {
+function init(){
+
   scene = new THREE.Scene();
+
   scene.background = new THREE.Color(0x87ceeb);
+
+  scene.fog = new THREE.Fog(
+    0xbfdfff,
+    100,
+    500
+  );
 
   camera = new THREE.PerspectiveCamera(
     75,
-    window.innerWidth/window.innerHeight,
+    window.innerWidth / window.innerHeight,
     0.1,
     1000
   );
 
-  renderer = new THREE.WebGLRenderer({ antialias:true });
-  renderer.setSize(window.innerWidth, window.innerHeight);
-  document.body.appendChild(renderer.domElement);
+  renderer = new THREE.WebGLRenderer({
+    antialias:true
+  });
 
-  /* LIGHTS */
-  scene.add(new THREE.AmbientLight(0xffffff,0.6));
+  renderer.setSize(
+    window.innerWidth,
+    window.innerHeight
+  );
 
-  const light = new THREE.DirectionalLight(0xffffff,1);
-  light.position.set(5,10,5);
-  scene.add(light);
+  document.body.appendChild(
+    renderer.domElement
+  );
 
-  /* TERRAIN */
+  // LIGHTS
+
+  scene.add(
+    new THREE.AmbientLight(
+      0xffffff,
+      0.7
+    )
+  );
+
+  const sun = new THREE.DirectionalLight(
+    0xffffff,
+    1
+  );
+
+  sun.position.set(
+    100,
+    150,
+    50
+  );
+
+  scene.add(sun);
+
+  // MAP
+
   createTerrain();
 
-  /* PLAYER */
+  // PLAYER
+
   player = new THREE.Object3D();
-  player.position.set(0,5,20);
+
+  player.position.set(
+    0,
+    5,
+    20
+  );
+
   scene.add(player);
+
   player.add(camera);
 
-  camera.position.set(0,1.6,0);
+  camera.position.set(
+    0,
+    1.6,
+    0
+  );
 
-  /* PC CONTROLS */
-  window.addEventListener("keydown", e=>{
-    if(e.key==="w") move.w=true;
-    if(e.key==="a") move.a=true;
-    if(e.key==="s") move.s=true;
-    if(e.key==="d") move.d=true;
-  });
+  // KEYBOARD
 
-  window.addEventListener("keyup", e=>{
-    if(e.key==="w") move.w=false;
-    if(e.key==="a") move.a=false;
-    if(e.key==="s") move.s=false;
-    if(e.key==="d") move.d=false;
-  });
+  window.addEventListener(
+    "keydown",
+    keyDown
+  );
 
-  /* MOUSE LOOK (PC) */
-  document.addEventListener("click", ()=>{
-    document.body.requestPointerLock();
-  });
+  window.addEventListener(
+    "keyup",
+    keyUp
+  );
 
-  document.addEventListener("mousemove", e=>{
-    if(document.pointerLockElement===document.body){
-      yaw -= e.movementX*0.002;
-      pitch -= e.movementY*0.002;
-      pitch = Math.max(-1.5,Math.min(1.5,pitch));
+  // MOUSE LOOK
+
+  document.addEventListener(
+    "click",
+    ()=>{
+      document.body.requestPointerLock();
     }
-  });
+  );
 
-  /* 📱 MOBILE CONTROLS */
+  document.addEventListener(
+    "mousemove",
+    e=>{
+
+      if(
+        document.pointerLockElement
+        === document.body
+      ){
+
+        yaw -= e.movementX * 0.002;
+
+        pitch -= e.movementY * 0.002;
+
+        pitch = Math.max(
+          -1.5,
+          Math.min(
+            1.5,
+            pitch
+          )
+        );
+      }
+    }
+  );
+
+  // MOBILE
+
   createMobileControls();
+
+  window.addEventListener(
+    "resize",
+    ()=>{
+
+      camera.aspect =
+      window.innerWidth /
+      window.innerHeight;
+
+      camera.updateProjectionMatrix();
+
+      renderer.setSize(
+        window.innerWidth,
+        window.innerHeight
+      );
+    }
+  );
 }
 
 /* =========================
-   📱 MOBILE CONTROLS
+   MOBILE CONTROLS
 ========================= */
 
 function createMobileControls(){
 
-  // JOYSTICK
   const joy = document.createElement("div");
+
   joy.style.cssText = `
-    position:absolute; bottom:60px; left:60px;
-    width:120px; height:120px;
-    background:rgba(255,255,255,0.2);
+    position:absolute;
+    left:40px;
+    bottom:40px;
+    width:120px;
+    height:120px;
     border-radius:50%;
+    background:rgba(255,255,255,0.25);
+    z-index:999;
   `;
+
   document.body.appendChild(joy);
 
-  joy.addEventListener("touchstart", e=>{
-    joystick.active=true;
-  });
+  let startX = 0;
+  let startY = 0;
 
-  joy.addEventListener("touchmove", e=>{
-    joystick.dx = (e.touches[0].clientX - window.innerWidth/2)/50;
-    joystick.dy = (e.touches[0].clientY - window.innerHeight/2)/50;
-  });
+  joy.addEventListener(
+    "touchstart",
+    e=>{
 
-  joy.addEventListener("touchend", ()=>{
-    joystick.active=false;
-    joystick.dx=0;
-    joystick.dy=0;
-  });
+      joystick.active = true;
+
+      startX =
+      e.touches[0].clientX;
+
+      startY =
+      e.touches[0].clientY;
+    }
+  );
+
+  joy.addEventListener(
+    "touchmove",
+    e=>{
+
+      joystick.dx =
+      e.touches[0].clientX
+      - startX;
+
+      joystick.dy =
+      e.touches[0].clientY
+      - startY;
+    }
+  );
+
+  joy.addEventListener(
+    "touchend",
+    ()=>{
+
+      joystick.active = false;
+
+      joystick.dx = 0;
+      joystick.dy = 0;
+    }
+  );
 
   // JUMP BUTTON
-  const jump = document.createElement("button");
-  jump.innerText="JUMP";
-  jump.style.cssText=`
-    position:absolute; bottom:80px; right:60px;
-    padding:20px; border-radius:50%;
+
+  const jumpBtn =
+  document.createElement(
+    "button"
+  );
+
+  jumpBtn.innerHTML = "JUMP";
+
+  jumpBtn.style.cssText = `
+    position:absolute;
+    right:40px;
+    bottom:60px;
+    width:90px;
+    height:90px;
+    border-radius:50%;
+    font-size:18px;
+    z-index:999;
   `;
-  document.body.appendChild(jump);
 
-  jump.addEventListener("touchstart", ()=>{
-    player.position.y += 2;
-    setTimeout(()=> player.position.y=5,300);
-  });
+  document.body.appendChild(
+    jumpBtn
+  );
 
-  // TOUCH LOOK
-  document.addEventListener("touchmove", e=>{
-    if(e.touches[0].clientX > window.innerWidth/2){
-      yaw -= e.touches[0].movementX * 0.003;
+  jumpBtn.addEventListener(
+    "touchstart",
+    ()=>{
+
+      if(!isJumping){
+
+        velocityY = 0.25;
+        isJumping = true;
+      }
     }
-  });
+  );
+}
+
+/* =========================
+   KEYS
+========================= */
+
+function keyDown(e){
+
+  if(e.key==="w") move.w=true;
+  if(e.key==="a") move.a=true;
+  if(e.key==="s") move.s=true;
+  if(e.key==="d") move.d=true;
+
+  if(e.code==="Space"){
+
+    if(!isJumping){
+
+      velocityY = 0.25;
+      isJumping = true;
+    }
+  }
+}
+
+function keyUp(e){
+
+  if(e.key==="w") move.w=false;
+  if(e.key==="a") move.a=false;
+  if(e.key==="s") move.s=false;
+  if(e.key==="d") move.d=false;
 }
 
 /* =========================
@@ -217,41 +495,134 @@ function createMobileControls(){
 ========================= */
 
 function animate(){
-  requestAnimationFrame(animate);
 
-  let speed=0.3;
+  requestAnimationFrame(
+    animate
+  );
 
-  let fx=Math.sin(yaw);
-  let fz=Math.cos(yaw);
-  let rx=Math.sin(yaw+Math.PI/2);
-  let rz=Math.cos(yaw+Math.PI/2);
+  const speed = 0.35;
 
-  // PC MOVEMENT
+  let fx = Math.sin(yaw);
+  let fz = Math.cos(yaw);
+
+  let rx =
+  Math.sin(
+    yaw + Math.PI/2
+  );
+
+  let rz =
+  Math.cos(
+    yaw + Math.PI/2
+  );
+
+  // PC MOVE
+
   if(move.w){
-    player.position.x -= fx*speed;
-    player.position.z -= fz*speed;
+
+    player.position.x
+    -= fx * speed;
+
+    player.position.z
+    -= fz * speed;
   }
+
   if(move.s){
-    player.position.x += fx*speed;
-    player.position.z += fz*speed;
+
+    player.position.x
+    += fx * speed;
+
+    player.position.z
+    += fz * speed;
   }
+
   if(move.a){
-    player.position.x -= rx*speed;
-    player.position.z -= rz*speed;
+
+    player.position.x
+    -= rx * speed;
+
+    player.position.z
+    -= rz * speed;
   }
+
   if(move.d){
-    player.position.x += rx*speed;
-    player.position.z += rz*speed;
+
+    player.position.x
+    += rx * speed;
+
+    player.position.z
+    += rz * speed;
   }
 
-  // MOBILE MOVEMENT
+  // MOBILE MOVE
+
   if(joystick.active){
-    player.position.x += joystick.dx*0.1;
-    player.position.z += joystick.dy*0.1;
+
+    player.position.x
+    += joystick.dx * 0.01;
+
+    player.position.z
+    += joystick.dy * 0.01;
   }
 
-  player.rotation.y=yaw;
-  camera.rotation.x=pitch;
+  // JUMP + GRAVITY
 
-  renderer.render(scene,camera);
+  player.position.y += velocityY;
+
+  velocityY -= 0.015;
+
+  if(player.position.y <= 5){
+
+    player.position.y = 5;
+
+    velocityY = 0;
+
+    isJumping = false;
+  }
+
+  player.rotation.y = yaw;
+
+  camera.rotation.x = pitch;
+
+  renderer.render(
+    scene,
+    camera
+  );
+}
+// 🌊 RIVER
+
+const river = new THREE.Mesh(
+  new THREE.BoxGeometry(40, 0.1, 180),
+  new THREE.MeshStandardMaterial({
+    color: 0x3399ff
+  })
+);
+
+river.position.set(
+  80,
+  0.05,
+  -120
+);
+
+scene.add(river);
+
+// 🪨 ROCKS
+
+for(let i=0;i<40;i++){
+
+  const rock = new THREE.Mesh(
+    new THREE.DodecahedronGeometry(
+      Math.random()*3 + 1
+    ),
+    new THREE.MeshStandardMaterial({
+      color:0x777777
+    })
+  );
+
+  rock.position.set(
+    (Math.random()*350)-175,
+    1,
+    (Math.random()*-350)
+  );
+
+  scene.add(rock);
 }
