@@ -154,8 +154,9 @@ function playSound(soundName) {
 function init() {
   clock = new THREE.Clock();
   scene = new THREE.Scene();
-  scene.background = new THREE.Color(0x030612);
-  scene.fog = new THREE.Fog(0x050816, 45, 260);
+  // ✅ DARK BLUE-BLACK SKY FOR MOONLIT NIGHT
+  scene.background = new THREE.Color(0x0a0f1f);
+  scene.fog = new THREE.Fog(0x0f1729, 45, 260);
 
   camera = new THREE.PerspectiveCamera(
     75,
@@ -170,16 +171,31 @@ function init() {
   renderer.shadowMap.enabled = true;
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
-  renderer.toneMappingExposure = 0.85;
+  renderer.toneMappingExposure = 0.95;
   document.body.appendChild(renderer.domElement);
 
-  scene.add(new THREE.AmbientLight(0x6f7fa8, 0.22));
+  // ✅ ENHANCED MOONLIGHT - BLUISH AMBIENT
+  scene.add(new THREE.AmbientLight(0x4a5f8f, 0.35));
 
-  const moon = new THREE.DirectionalLight(0xaac8ff, 0.9);
-  moon.position.set(-120, 180, 90);
+  // ✅ MOON DIRECTIONAL LIGHT - BRIGHT MOONLIGHT
+  const moon = new THREE.DirectionalLight(0xb8d5ff, 1.3);
+  moon.position.set(-150, 220, 120);
   moon.castShadow = true;
-  moon.shadow.mapSize.set(2048, 2048);
+  moon.shadow.mapSize.set(4096, 4096);
+  moon.shadow.camera.near = 0.5;
+  moon.shadow.camera.far = 500;
+  moon.shadow.camera.left = -300;
+  moon.shadow.camera.right = 300;
+  moon.shadow.camera.top = 300;
+  moon.shadow.camera.bottom = -300;
   scene.add(moon);
+
+  // ✅ VISUAL MOON IN SKY
+  const moonGeometry = new THREE.SphereGeometry(40, 32, 32);
+  const moonMaterial = new THREE.MeshBasicMaterial({ color: 0xe8f0ff });
+  const moonMesh = new THREE.Mesh(moonGeometry, moonMaterial);
+  moonMesh.position.set(-150, 400, -300);
+  scene.add(moonMesh);
 
   createWorld();
 
@@ -192,7 +208,11 @@ function init() {
   camera.position.set(0, eyeHeight, 0);
   camera.rotation.order = "YXZ";
 
-  torchLight = new THREE.SpotLight(0xffffff, 0, 120, Math.PI / 7, 0.35, 1.5);
+  // ✅ ENHANCED TORCH - BRIGHTER & WIDER BEAM
+  torchLight = new THREE.SpotLight(0xffffff, 0, 180, Math.PI / 5, 0.45, 1.8);
+  torchLight.shadow.mapSize.set(2048, 2048);
+  torchLight.shadow.camera.near = 0.1;
+  torchLight.shadow.camera.far = 180;
   camera.add(torchLight);
   camera.add(torchLight.target);
   torchLight.target.position.set(0, 0, -1);
@@ -607,13 +627,13 @@ function updatePlayer(delta) {
     direction.addScaledVector(forward, -joyY);
   }
 
-  // ✅ STAMINA CHECK
+  // ✅ STAMINA CHECK - SLOWER DRAIN (takes longer to run out)
   if (running && direction.lengthSq() > 0) {
-    stamina = Math.max(0, stamina - 0.5);
+    stamina = Math.max(0, stamina - 0.15); // ✅ SLOWER DRAIN (reduced from 0.5)
     if (stamina <= 0) running = false;
     playSound("footstep");
   } else {
-    stamina = Math.min(100, stamina + 0.2);
+    stamina = Math.min(100, stamina + 0.25); // ✅ FASTER RECOVERY
   }
 
   if (direction.lengthSq() > 0) {
@@ -969,7 +989,8 @@ function togglePause() {
 function toggleTorch() {
   if (battery > 0) {
     torchOn = !torchOn;
-    if (torchLight) torchLight.intensity = torchOn ? 5 : 0;
+    // ✅ INCREASED TORCH INTENSITY (brighter flash)
+    if (torchLight) torchLight.intensity = torchOn ? 8 : 0;
 
     const torchBtn = document.getElementById("torchBtn");
     if (torchBtn) torchBtn.innerHTML = torchOn ? "Torch ON" : "Torch";
@@ -996,12 +1017,13 @@ function updateStaminaUI() {
   if (staminaFill) staminaFill.style.width = stamina + "%";
 }
 
-// ✅ BATTERY UI
+// ✅ BATTERY UI - VERY SLOW DRAIN (long lasting battery)
 function updateBatteryUI() {
   const torchIndicator = document.getElementById("torchIndicator");
   if (torchIndicator) {
     if (torchOn) {
-      battery = Math.max(0, battery - 0.1);
+      // ✅ VERY SLOW BATTERY DRAIN (reduced from 0.1 to 0.008)
+      battery = Math.max(0, battery - 0.008);
       if (battery <= 0) {
         torchOn = false;
         if (torchLight) torchLight.intensity = 0;
