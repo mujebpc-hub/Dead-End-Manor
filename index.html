@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Horror House Game</title>
+  <title>THE WATCHER</title>
 
   <link rel="stylesheet" href="style.css">
 
@@ -16,7 +16,7 @@
       margin: 0;
       overflow: hidden;
       font-family: Arial, sans-serif;
-      background: black;
+      background: #000;
     }
 
     #home,
@@ -32,10 +32,11 @@
       justify-content: center;
       align-items: center;
       flex-direction: column;
-      background: black;
-      color: white;
+      background: radial-gradient(circle at center, #111 0%, #000 70%);
+      color: #fff;
       z-index: 50;
       text-align: center;
+      padding: 24px;
     }
 
     #loading,
@@ -46,33 +47,43 @@
     }
 
     h1 {
-      font-size: 42px;
-      letter-spacing: 2px;
-      margin-bottom: 20px;
+      font-size: 46px;
+      letter-spacing: 4px;
+      margin: 0 0 20px;
+      color: #f2f2f2;
+      text-shadow: 0 0 18px rgba(180, 0, 0, 0.8);
     }
 
     h2 {
-      font-size: 30px;
-      margin-bottom: 16px;
+      font-size: 28px;
+      margin: 0 0 18px;
+      letter-spacing: 2px;
+    }
+
+    p {
+      max-width: 520px;
+      margin: 0 0 18px;
+      color: #bdbdbd;
+      line-height: 1.5;
     }
 
     button {
+      min-width: 160px;
       padding: 12px 24px;
       margin-top: 10px;
       cursor: pointer;
-      border: none;
+      border: 1px solid rgba(255, 255, 255, 0.25);
       border-radius: 6px;
-      background: #b30000;
-      color: white;
+      background: #850000;
+      color: #fff;
       font-size: 16px;
       font-weight: bold;
     }
 
     button:hover {
-      background: #e00000;
+      background: #b30000;
     }
 
-    /* GAME UI */
     #gameUI {
       position: absolute;
       inset: 0;
@@ -81,9 +92,9 @@
       pointer-events: none;
       z-index: 20;
       display: none;
-      color: white;
+      color: #fff;
       font-weight: bold;
-      text-shadow: 0 2px 4px black;
+      text-shadow: 0 2px 4px #000;
     }
 
     #healthBox {
@@ -93,18 +104,32 @@
       font-size: 18px;
     }
 
-    #healthBar {
-      width: 170px;
+    #healthBar,
+    #staminaBar {
+      width: 180px;
       height: 16px;
       margin-top: 6px;
-      border: 2px solid white;
+      border: 2px solid #fff;
       background: rgba(255, 255, 255, 0.15);
     }
 
     #healthFill {
       width: 100%;
       height: 100%;
-      background: #e00000;
+      background: #d00000;
+    }
+
+    #staminaBox {
+      position: absolute;
+      top: 72px;
+      left: 16px;
+      font-size: 16px;
+    }
+
+    #staminaFill {
+      width: 100%;
+      height: 100%;
+      background: #e0b000;
     }
 
     #objectiveText {
@@ -117,18 +142,36 @@
       max-width: 60%;
     }
 
+    #interactionText {
+      position: absolute;
+      bottom: 150px;
+      left: 50%;
+      transform: translateX(-50%);
+      display: none;
+      font-size: 18px;
+      text-align: center;
+    }
+
+    #torchIndicator {
+      position: absolute;
+      top: 116px;
+      left: 16px;
+      font-size: 16px;
+    }
+
     #pauseBtn {
       position: absolute;
       top: 16px;
       right: 16px;
       pointer-events: auto;
-      width: 48px;
-      height: 48px;
+      width: 54px;
+      height: 54px;
+      min-width: 54px;
       padding: 0;
       border-radius: 50%;
-      font-size: 20px;
-      background: rgba(0, 0, 0, 0.65);
-      border: 2px solid white;
+      font-size: 15px;
+      background: rgba(0, 0, 0, 0.7);
+      border: 2px solid #fff;
     }
 
     #crosshair {
@@ -138,7 +181,7 @@
       transform: translate(-50%, -50%);
       font-size: 34px;
       line-height: 1;
-      color: white;
+      color: #fff;
     }
 
     #mobileControls {
@@ -153,43 +196,73 @@
 
     #torchBtn,
     #runBtn {
-      width: 92px;
+      width: 98px;
       height: 46px;
+      min-width: 98px;
       padding: 0;
       border-radius: 8px;
-      background: rgba(0, 0, 0, 0.7);
-      border: 2px solid white;
+      background: rgba(0, 0, 0, 0.72);
+      border: 2px solid #fff;
       font-size: 15px;
+    }
+
+    #gameOver h1 {
+      color: #c90000;
+    }
+
+    #victory h1 {
+      color: #f1f1f1;
     }
 
     @media (max-width: 600px) {
       h1 {
-        font-size: 32px;
+        font-size: 34px;
       }
 
       h2 {
-        font-size: 24px;
+        font-size: 22px;
       }
 
-      #healthBox {
-        font-size: 15px;
+      button {
+        min-width: 145px;
+        font-size: 14px;
       }
 
-      #healthBar {
-        width: 130px;
+      #healthBox,
+      #staminaBox,
+      #torchIndicator {
+        font-size: 14px;
+      }
+
+      #healthBar,
+      #staminaBar {
+        width: 135px;
         height: 14px;
       }
 
       #objectiveText {
-        top: 70px;
-        font-size: 15px;
-        max-width: 90%;
+        top: 74px;
+        font-size: 14px;
+        max-width: 88%;
       }
 
       #pauseBtn {
-        width: 42px;
-        height: 42px;
-        font-size: 18px;
+        width: 44px;
+        height: 44px;
+        min-width: 44px;
+        font-size: 13px;
+      }
+
+      #mobileControls {
+        right: 18px;
+        bottom: 160px;
+      }
+
+      #torchBtn,
+      #runBtn {
+        width: 86px;
+        min-width: 86px;
+        font-size: 13px;
       }
     }
   </style>
@@ -197,55 +270,61 @@
 
 <body>
 
-  <!-- HOME -->
   <div id="home">
     <h1>THE WATCHER</h1>
-    <button onclick="startGame()">PLAY NOW</button>
+    <p>Survive the night. Find the mansion. Escape before The Watcher finds you.</p>
+    <button onclick="startGame()">START</button>
+    <button type="button">SETTINGS</button>
+    <button type="button">CREDITS</button>
   </div>
 
-  <!-- LOADING -->
   <div id="loading">
-    <h2>LOADING...</h2>
+    <h2>Loading The Watcher...</h2>
   </div>
 
-  <!-- MENU -->
   <div id="menu">
-    <h2>MAIN MENU</h2>
+    <h1>THE WATCHER</h1>
     <button onclick="enterGame()">ENTER GAME</button>
   </div>
 
-  <!-- GAME UI -->
   <div id="gameUI">
     <div id="healthBox">
-      ❤️ Health: <span id="healthValue">100</span>
+      Health: <span id="healthValue">100</span>
       <div id="healthBar">
         <div id="healthFill"></div>
       </div>
     </div>
 
-    <div id="objectiveText">Find the Mansion Key</div>
+    <div id="staminaBox">
+      Stamina
+      <div id="staminaBar">
+        <div id="staminaFill"></div>
+      </div>
+    </div>
 
-    <button id="pauseBtn" onclick="togglePause()">⏸</button>
+    <div id="torchIndicator">Torch: OFF</div>
+    <div id="objectiveText">Find the Mansion Key</div>
+    <div id="interactionText">Press E</div>
+
+    <button id="pauseBtn" onclick="togglePause()">Pause</button>
 
     <div id="crosshair">+</div>
 
     <div id="mobileControls">
-      <button id="torchBtn" onclick="toggleTorch()">🔦 Torch</button>
-      <button id="runBtn">🏃 Run</button>
+      <button id="torchBtn" onclick="toggleTorch()">Torch</button>
+      <button id="runBtn">Run</button>
     </div>
   </div>
 
-  <!-- GAME OVER -->
   <div id="gameOver">
-    <h1>GAME OVER</h1>
-    <button onclick="restartGame()">Restart</button>
-    <button onclick="backToMenu()">Main Menu</button>
+    <h1>YOU DIED</h1>
+    <button onclick="restartGame()">RETRY</button>
+    <button onclick="backToMenu()">MAIN MENU</button>
   </div>
 
-  <!-- VICTORY -->
   <div id="victory">
     <h1>YOU ESCAPED</h1>
-    <button onclick="restartGame()">Play Again</button>
+    <button onclick="restartGame()">PLAY AGAIN</button>
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
@@ -253,18 +332,3 @@
 
 </body>
 </html>
-अब आपके game.js में enterGame() function के अंदर यह line भी add कर देना:
-
-document.getElementById("gameUI").style.display = "block";
-मतलब:
-
-function enterGame() {
-  document.getElementById("menu").style.display = "none";
-  document.getElementById("gameUI").style.display = "block";
-
-  if (!gameStarted) {
-    gameStarted = true;
-    init();
-    animate();
-  }
-}
