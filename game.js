@@ -1,6 +1,7 @@
 let scene, camera, renderer;
 let player;
 let torchLight;
+let clock;
 
 let gameStarted = false;
 let paused = false;
@@ -11,6 +12,12 @@ let health = 100;
 let move = { w: false, a: false, s: false, d: false };
 let yaw = 0;
 let pitch = 0;
+
+const mouseSensitivity = 0.002;
+const walkSpeed = 8;
+const runSpeed = 13;
+const playerHeight = 5;
+const eyeHeight = 1.6;
 
 let joystick = { active: false, dx: 0, dy: 0 };
 let velocityY = 0;
@@ -37,6 +44,8 @@ function enterGame() {
     init();
     animate();
   }
+
+  requestPointerControl();
 }
 
 function createTree(x, z) {
@@ -56,21 +65,16 @@ function createTree(x, z) {
 }
 
 function createTerrain() {
-
   const loader = new THREE.TextureLoader();
-
   const grass = loader.load("textures/grass.jpg");
 
   grass.wrapS = THREE.RepeatWrapping;
   grass.wrapT = THREE.RepeatWrapping;
-
-  grass.repeat.set(40,40);
+  grass.repeat.set(40, 40);
 
   const ground = new THREE.Mesh(
     new THREE.PlaneGeometry(500, 500, 100, 100),
-    new THREE.MeshStandardMaterial({
-      map: grass
-    })
+    new THREE.MeshStandardMaterial({ map: grass })
   );
   ground.rotation.x = -Math.PI / 2;
   scene.add(ground);
@@ -134,6 +138,8 @@ function createTerrain() {
 }
 
 function init() {
+  clock = new THREE.Clock();
+
   scene = new THREE.Scene();
   scene.background = new THREE.Color(0x050510);
   scene.fog = new THREE.Fog(0xbfdfff, 100, 500);
@@ -167,11 +173,12 @@ function init() {
   createTerrain();
 
   player = new THREE.Object3D();
-  player.position.set(0, 5, 20);
+  player.position.set(0, playerHeight, 20);
   scene.add(player);
 
   player.add(camera);
-  camera.position.set(0, 1.6, 0);
+  camera.position.set(0, eyeHeight, 0);
+  camera.rotation.order = "YXZ";
 
   torchLight = new THREE.SpotLight(0xffffff, 0, 90, Math.PI / 7, 0.35, 1.5);
   torchLight.position.set(0, 0, 0);
@@ -181,20 +188,9 @@ function init() {
 
   window.addEventListener("keydown", keyDown);
   window.addEventListener("keyup", keyUp);
-
-  document.addEventListener("click", () => {
-    if (!paused && document.body.requestPointerLock) {
-      document.body.requestPointerLock();
-    }
-  });
-
-  document.addEventListener("mousemove", (e) => {
-    if (document.pointerLockElement === document.body && !paused) {
-      yaw -= e.movementX * 0.002;
-      pitch -= e.movementY * 0.002;
-      pitch = Math.max(-1.5, Math.min(1.5, pitch));
-    }
-  });
+  document.addEventListener("click", requestPointerControl);
+  document.addEventListener("mousemove", handleMouseLook);
+  document.addEventListener("pointerlockchange", handlePointerLockChange);
 
   setupMobileUiButtons();
   createMobileControls();
@@ -205,6 +201,30 @@ function init() {
     camera.updateProjectionMatrix();
     renderer.setSize(window.innerWidth, window.innerHeight);
   });
+}
+
+function requestPointerControl() {
+  if (!paused && gameStarted && document.body.requestPointerLock) {
+    document.body.requestPointerLock();
+  }
+}
+
+function handleMouseLook(e) {
+  if (document.pointerLockElement !== document.body || paused) return;
+
+  yaw -= e.movementX * mouseSensitivity;
+  pitch -= e.movementY * mouseSensitivity;
+  pitch = Math.max(-1.5, Math.min(1.5, pitch));
+}
+
+function handlePointerLockChange() {
+  if (document.pointerLockElement !== document.body && gameStarted) {
+    move.w = false;
+    move.a = false;
+    move.s = false;
+    move.d = false;
+    running = false;
+  }
 }
 
 function setupMobileUiButtons() {
@@ -296,7 +316,7 @@ function createMobileControls() {
 
 function jump() {
   if (!isJumping && !paused) {
-    velocityY = 0.25;
+    velocityY = 5.5;
     isJumping = true;
   }
 }
@@ -311,7 +331,7 @@ function keyDown(e) {
   if (key === "shift") running = true;
   if (e.code === "Space") jump();
   if (key === "f") toggleTorch();
-  if (key === "p" || e.code === "Escape") togglePause();
+  if (key === "p") togglePause();
 }
 
 function keyUp(e) {
@@ -324,16 +344,60 @@ function keyUp(e) {
   if (key === "shift") running = false;
 }
 
+function updateFpsController(delta) {
+  player.rotation.y = yaw;
+  camera.rotation.x = pitch;
+
+  const currentSpeed = running ? runSpeed : walkSpeed;
+  const forward = new THREE.Vector3(0, 0, -1);
+  const right = new THREE.Vector3(1, 0, 0);
+  const direction = new THREE.Vector3();
+
+  forward.applyAxisAngle(new THREE.Vector3(0, 1, 0), yaw);
+  right.applyAxisAngle(new THREE.Vector3(0, 1, 0), yaw);
+
+  if (move.w) direction.add(forward);
+  if (move.s) direction.sub(forward);
+  if (move.d) direction.add(right);
+  if (move.a) direction.sub(right);
+
+  if (joystick.active) {
+    const joyX = THREE.MathUtils.clamp(joystick.dx / 60, -1, 1);
+    const joyY = THREE.MathUtils.clamp(joystick.dy / 60, -1, 1);
+    direction.addScaledVector(right, joyX);
+    direction.addScaledVector(forward, -joyY);
+  }
+
+  if (direction.lengthSq() > 0) {
+    direction.normalize();
+    player.position.x += direction.x * currentSpeed * delta;
+    player.position.z += direction.z * currentSpeed * delta;
+  }
+}
+
+function updateGravity(delta) {
+  player.position.y += velocityY * delta;
+  velocityY -= 18 * delta;
+
+  if (player.position.y <= playerHeight) {
+    player.position.y = playerHeight;
+    velocityY = 0;
+    isJumping = false;
+  }
+}
+
 function togglePause() {
   paused = !paused;
 
   const pauseBtn = document.getElementById("pauseBtn");
   if (pauseBtn) {
-    pauseBtn.innerHTML = paused ? "▶" : "⏸";
+    pauseBtn.innerHTML = paused ? "Play" : "Pause";
   }
 
   if (paused && document.exitPointerLock) {
     document.exitPointerLock();
+  } else {
+    requestPointerControl();
   }
 }
 
@@ -346,7 +410,7 @@ function toggleTorch() {
 
   const torchBtn = document.getElementById("torchBtn");
   if (torchBtn) {
-    torchBtn.innerHTML = torchOn ? "🔦 ON" : "🔦 Torch";
+    torchBtn.innerHTML = torchOn ? "Torch ON" : "Torch";
   }
 }
 
@@ -401,55 +465,12 @@ function animate() {
 
   if (!player || !renderer || !scene || !camera) return;
 
-  if (paused) {
-    renderer.render(scene, camera);
-    return;
+  const delta = Math.min(clock.getDelta(), 0.05);
+
+  if (!paused) {
+    updateFpsController(delta);
+    updateGravity(delta);
   }
-
-  const speed = running ? 0.6 : 0.35;
-
-  const fx = Math.sin(yaw);
-  const fz = Math.cos(yaw);
-  const rx = Math.sin(yaw + Math.PI / 2);
-  const rz = Math.cos(yaw + Math.PI / 2);
-
-  if (move.w) {
-    player.position.x -= fx * speed;
-    player.position.z -= fz * speed;
-  }
-
-  if (move.s) {
-    player.position.x += fx * speed;
-    player.position.z += fz * speed;
-  }
-
-  if (move.a) {
-    player.position.x -= rx * speed;
-    player.position.z -= rz * speed;
-  }
-
-  if (move.d) {
-    player.position.x += rx * speed;
-    player.position.z += rz * speed;
-  }
-
-  if (joystick.active) {
-    const mobileSpeed = running ? 0.018 : 0.01;
-    player.position.x += joystick.dx * mobileSpeed;
-    player.position.z += joystick.dy * mobileSpeed;
-  }
-
-  player.position.y += velocityY;
-  velocityY -= 0.015;
-
-  if (player.position.y <= 5) {
-    player.position.y = 5;
-    velocityY = 0;
-    isJumping = false;
-  }
-
-  player.rotation.y = yaw;
-  camera.rotation.x = pitch;
 
   renderer.render(scene, camera);
 }
