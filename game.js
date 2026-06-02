@@ -6,7 +6,7 @@ let torchOn = false;
 let running = false;
 let health = 100;
 let stamina = 100;
-let battery = 100;
+let battery = 1000;
 
 const WORLD_WIDTH = 1500;
 const WORLD_DEPTH = 1800;
