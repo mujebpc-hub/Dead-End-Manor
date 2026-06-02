@@ -5,6 +5,8 @@ let paused = false;
 let torchOn = false;
 let running = false;
 let health = 100;
+let stamina = 100;
+let battery = 100;
 
 const WORLD_WIDTH = 1500;
 const WORLD_DEPTH = 1800;
@@ -29,6 +31,42 @@ let enemyTarget = new THREE.Vector3();
 let enemyPauseTimer = 0;
 let jumpscareStarted = false;
 
+// ✅ INVENTORY SYSTEM
+let inventory = {
+  key: false,
+  batteries: 0,
+  notes: []
+};
+
+// ✅ OBJECTIVE SYSTEM
+let currentObjective = "Find the Mansion Key";
+let objectiveStage = 0; // 0: Key, 1: Mansion, 2: Unlock, 3: Escape
+
+// ✅ SOUND SYSTEM (Web Audio API)
+let audioContext;
+let soundLibrary = {};
+let activeSounds = {};
+
+// ✅ DANGER SYSTEM
+let dangerLevel = 0; // 0-3: none, low, high, critical
+let lastPlayerSound = { time: 0, type: "none" }; // Last sound enemy heard
+let enemyInvestigating = false;
+let investigateTarget = new THREE.Vector3();
+let investigateTimer = 0;
+
+// ✅ MANSION ENTRY
+let mansionDoor = null;
+let doorUnlocked = false;
+let escapePoint = new THREE.Vector3(0, 0, 500);
+
+// ✅ KEY & ITEMS
+let keyPickup = null;
+let notesInWorld = [];
+
+// ✅ RANDOM HORROR EVENTS
+let horrorEventTimer = 0;
+let lastHorrorEvent = 0;
+
 function startGame() {
   document.getElementById("home").style.display = "none";
   document.getElementById("loading").style.display = "flex";
@@ -47,11 +85,70 @@ function enterGame() {
 
   if (!gameStarted) {
     gameStarted = true;
+    initAudioContext();
     init();
     animate();
   }
 
   requestPointerControl();
+}
+
+// ✅ SOUND SYSTEM INIT
+function initAudioContext() {
+  if (!audioContext) {
+    audioContext = new (window.AudioContext || window.webkitAudioContext)();
+  }
+}
+
+// ✅ CREATE SOUND WITH WEB AUDIO API
+function createSound(name, frequency, duration, type = "sine") {
+  if (!audioContext) return;
+
+  const osc = audioContext.createOscillator();
+  const gain = audioContext.createGain();
+  
+  osc.connect(gain);
+  gain.connect(audioContext.destination);
+  
+  osc.frequency.value = frequency;
+  osc.type = type;
+  
+  gain.gain.setValueAtTime(0.1, audioContext.currentTime);
+  gain.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + duration);
+  
+  osc.start(audioContext.currentTime);
+  osc.stop(audioContext.currentTime + duration);
+}
+
+// ✅ PLAY SOUNDS
+function playSound(soundName) {
+  if (!audioContext) return;
+
+  switch(soundName) {
+    case "heartbeat":
+      createSound("heartbeat", 60, 0.3, "sine");
+      break;
+    case "chase_music":
+      createSound("chase", 150, 0.5, "square");
+      break;
+    case "jumpscare":
+      createSound("jumpscare", 200, 0.8, "sine");
+      createSound("jumpscare2", 300, 0.8, "square");
+      break;
+    case "footstep":
+      createSound("footstep", 100, 0.15, "sine");
+      break;
+    case "key_pickup":
+      createSound("pickup", 800, 0.3, "sine");
+      createSound("pickup2", 1000, 0.3, "sine");
+      break;
+    case "door_open":
+      createSound("door", 200, 0.5, "sine");
+      break;
+    case "ghost_whisper":
+      createSound("whisper", 120, 0.4, "sine");
+      break;
+  }
 }
 
 function init() {
@@ -110,6 +207,9 @@ function init() {
   setupMobileUiButtons();
   createMobileControls();
   updateHealthUI();
+  updateStaminaUI();
+  updateBatteryUI();
+  updateObjectiveUI();
 }
 
 function createWorld() {
@@ -118,6 +218,8 @@ function createWorld() {
   createForest();
   createRocks();
   createEnemy();
+  createKey();
+  createNotes();
 }
 
 function getTerrainHeight(x, z) {
@@ -175,13 +277,15 @@ function createMansion() {
   scene.add(mansion);
   addBoxCollider(mansion);
 
-  const door = new THREE.Mesh(
+  // ✅ MANSION DOOR
+  mansionDoor = new THREE.Mesh(
     new THREE.BoxGeometry(9, 15, 1.5),
     new THREE.MeshStandardMaterial({ color: 0x151515 })
   );
-  door.position.set(0, getTerrainHeight(0, -389) + 7.5, -389);
-  scene.add(door);
-  addBoxCollider(door);
+  mansionDoor.position.set(0, getTerrainHeight(0, -389) + 7.5, -389);
+  mansionDoor.userData.type = "door";
+  scene.add(mansionDoor);
+  addBoxCollider(mansionDoor);
 
   const tower = new THREE.Mesh(
     new THREE.BoxGeometry(22, 48, 22),
@@ -245,6 +349,46 @@ function createRocks() {
   }
 }
 
+// ✅ CREATE KEY PICKUP
+function createKey() {
+  const keyGeometry = new THREE.BoxGeometry(0.8, 1.5, 0.2);
+  const keyMaterial = new THREE.MeshStandardMaterial({ color: 0xffd700, metalness: 0.8 });
+  
+  keyPickup = new THREE.Mesh(keyGeometry, keyMaterial);
+  keyPickup.position.set(50, getTerrainHeight(50, 100) + 2, 100);
+  keyPickup.castShadow = true;
+  keyPickup.userData.type = "key";
+  scene.add(keyPickup);
+}
+
+// ✅ CREATE NOTES IN WORLD
+function createNotes() {
+  const noteTexts = [
+    "HELP... TRAPPED HERE",
+    "DON'T GO OUT AT NIGHT",
+    "IT WATCHES... ALWAYS",
+    "THE KEY IS HIDDEN"
+  ];
+
+  for (let i = 0; i < 3; i++) {
+    const notePos = new THREE.Vector3(
+      Math.random() * 200 - 100,
+      getTerrainHeight(Math.random() * 200 - 100, Math.random() * 200 - 100) + 1,
+      Math.random() * 200 - 100
+    );
+
+    const noteGeometry = new THREE.BoxGeometry(1, 1.5, 0.1);
+    const noteMaterial = new THREE.MeshStandardMaterial({ color: 0xd4a574 });
+    const note = new THREE.Mesh(noteGeometry, noteMaterial);
+    
+    note.position.copy(notePos);
+    note.userData.type = "note";
+    note.userData.text = noteTexts[i];
+    scene.add(note);
+    notesInWorld.push(note);
+  }
+}
+
 function createEnemy() {
   enemy = new THREE.Group();
 
@@ -275,14 +419,19 @@ function createEnemy() {
 
   enemy.position.set(90, getTerrainHeight(90, -250), -250);
   enemy.userData.speed = 5;
+  enemy.userData.lastKnownPlayerPos = new THREE.Vector3();
+  enemy.userData.canSeePlayer = false;
   scene.add(enemy);
   pickEnemyPatrolTarget();
 }
 
 function detectPlayer() {
   const distance = enemy.position.distanceTo(player.position);
+  
+  // ✅ CLOSE DETECTION
   if (distance < 40) return true;
 
+  // ✅ VISION CONE
   const toPlayer = new THREE.Vector3().subVectors(player.position, enemy.position);
   toPlayer.y = 0;
 
@@ -295,39 +444,67 @@ function detectPlayer() {
     if (enemyForward.dot(toPlayer) > 0.45) return true;
   }
 
+  // ✅ SOUND DETECTION
+  if (lastPlayerSound.type === "footstep" && distance < 50) return true;
+  if (lastPlayerSound.type === "jump" && distance < 60) return true;
+
   return false;
 }
 
+// ✅ BETTER ENEMY AI
 function updateEnemyAI(delta) {
   if (!enemy || jumpscareStarted) return;
 
   const distance = enemy.position.distanceTo(player.position);
 
+  // ✅ KILL CHECK
   if (distance < 3) {
     triggerJumpscare();
     return;
   }
 
+  // ✅ DETECTION FLOW
   if (enemyState !== "chase" && detectPlayer()) {
     enemyState = "chase";
+    playSound("chase_music");
   }
 
+  // ✅ CHASE TO LOST
   if (enemyState === "chase" && distance > 95) {
-    enemyState = "lost";
-    enemyPauseTimer = 1.5;
+    enemyState = "investigate";
+    enemy.userData.lastKnownPlayerPos.copy(player.position);
+    enemyInvestigating = true;
+    investigateTimer = 5;
   }
 
+  // ✅ STATES
   if (enemyState === "patrol") patrolEnemy(delta);
+  if (enemyState === "investigate") investigateEnemy(delta);
   if (enemyState === "chase") chasePlayer(delta);
-  if (enemyState === "lost") {
-    enemyPauseTimer -= delta;
-    if (enemyPauseTimer <= 0) {
-      enemyState = "patrol";
-      pickEnemyPatrolTarget();
-    }
-  }
 
   enemy.position.y = getTerrainHeight(enemy.position.x, enemy.position.z);
+  updateDangerLevel(distance);
+}
+
+// ✅ INVESTIGATE STATE
+function investigateEnemy(delta) {
+  const investigatePos = enemy.userData.lastKnownPlayerPos;
+  const dist = enemy.position.distanceTo(investigatePos);
+
+  if (dist < 8) {
+    enemyState = "patrol";
+    enemyInvestigating = false;
+    pickEnemyPatrolTarget();
+    return;
+  }
+
+  const dir = new THREE.Vector3().subVectors(investigatePos, enemy.position);
+  dir.y = 0;
+  dir.normalize();
+
+  enemy.position.addScaledVector(dir, 6 * delta);
+  enemy.lookAt(investigatePos.x, enemy.position.y, investigatePos.z);
+  avoidEnemyHardClip();
 }
 
 function patrolEnemy(delta) {
@@ -368,6 +545,39 @@ function pickEnemyPatrolTarget() {
   enemyTarget.y = getTerrainHeight(enemyTarget.x, enemyTarget.z);
 }
 
+// ✅ DANGER LEVEL SYSTEM
+function updateDangerLevel(distance) {
+  if (distance < 8) {
+    dangerLevel = 3;
+    if (Math.random() > 0.8) playSound("heartbeat");
+    applyDangerUI("critical");
+  } else if (distance < 15) {
+    dangerLevel = 2;
+    if (Math.random() > 0.85) playSound("heartbeat");
+    applyDangerUI("high");
+  } else if (distance < 30) {
+    dangerLevel = 1;
+    applyDangerUI("medium");
+  } else {
+    dangerLevel = 0;
+    applyDangerUI("none");
+  }
+}
+
+// ✅ DANGER UI APPLICATION
+function applyDangerUI(level) {
+  const gameUI = document.getElementById("gameUI");
+  
+  gameUI.classList.remove("enemy-near", "danger-shake");
+  
+  if (level === "high" || level === "critical") {
+    gameUI.classList.add("enemy-near");
+  }
+  if (level === "critical") {
+    gameUI.classList.add("danger-shake");
+  }
+}
+
 function updatePlayer(delta) {
   player.rotation.y = yaw;
   camera.rotation.x = pitch;
@@ -397,10 +607,26 @@ function updatePlayer(delta) {
     direction.addScaledVector(forward, -joyY);
   }
 
+  // ✅ STAMINA CHECK
+  if (running && direction.lengthSq() > 0) {
+    stamina = Math.max(0, stamina - 0.5);
+    if (stamina <= 0) running = false;
+    playSound("footstep");
+  } else {
+    stamina = Math.min(100, stamina + 0.2);
+  }
+
   if (direction.lengthSq() > 0) {
     direction.normalize();
     player.position.x += direction.x * currentSpeed * delta;
     player.position.z += direction.z * currentSpeed * delta;
+    
+    // ✅ SOUND TRIGGER
+    if (running) {
+      lastPlayerSound = { time: Date.now(), type: "run" };
+    } else if (direction.lengthSq() > 0) {
+      lastPlayerSound = { time: Date.now(), type: "footstep" };
+    }
   }
 
   const limitX = WORLD_WIDTH / 2 - 10;
@@ -409,6 +635,111 @@ function updatePlayer(delta) {
   player.position.z = THREE.MathUtils.clamp(player.position.z, -limitZ, limitZ);
 
   handleCollisions();
+  checkInteractions();
+}
+
+// ✅ INTERACTION CHECK
+function checkInteractions() {
+  const interactionRange = 5;
+  const interactionText = document.getElementById("interactionText");
+
+  let nearItem = false;
+
+  // ✅ CHECK KEY
+  if (keyPickup && !inventory.key) {
+    const keyDist = player.position.distanceTo(keyPickup.position);
+    if (keyDist < interactionRange) {
+      interactionText.style.display = "block";
+      interactionText.innerText = "Press E to Pick Up Key";
+      nearItem = true;
+    }
+  }
+
+  // ✅ CHECK DOOR
+  if (mansionDoor && inventory.key && !doorUnlocked) {
+    const doorDist = player.position.distanceTo(mansionDoor.position);
+    if (doorDist < interactionRange) {
+      interactionText.style.display = "block";
+      interactionText.innerText = "Press E to Unlock Door";
+      nearItem = true;
+    }
+  }
+
+  // ✅ CHECK NOTES
+  for (let note of notesInWorld) {
+    const noteDist = player.position.distanceTo(note.position);
+    if (noteDist < interactionRange) {
+      interactionText.style.display = "block";
+      interactionText.innerText = "Press E to Read Note";
+      nearItem = true;
+      break;
+    }
+  }
+
+  // ✅ ESCAPE POINT
+  if (doorUnlocked) {
+    const escapeDist = player.position.distanceTo(escapePoint);
+    if (escapeDist < 20) {
+      showVictory();
+    }
+  }
+
+  if (!nearItem) {
+    interactionText.style.display = "none";
+  }
+}
+
+// ✅ INTERACTION HANDLER
+function handleInteraction() {
+  const interactionRange = 5;
+
+  // ✅ PICK UP KEY
+  if (keyPickup && !inventory.key) {
+    if (player.position.distanceTo(keyPickup.position) < interactionRange) {
+      inventory.key = true;
+      scene.remove(keyPickup);
+      playSound("key_pickup");
+      updateObjective(1);
+      return;
+    }
+  }
+
+  // ✅ UNLOCK DOOR
+  if (mansionDoor && inventory.key && !doorUnlocked) {
+    if (player.position.distanceTo(mansionDoor.position) < interactionRange) {
+      doorUnlocked = true;
+      mansionDoor.material.color.setHex(0x3d3d3d);
+      playSound("door_open");
+      updateObjective(2);
+      return;
+    }
+  }
+
+  // ✅ READ NOTES
+  for (let i = 0; i < notesInWorld.length; i++) {
+    const note = notesInWorld[i];
+    if (player.position.distanceTo(note.position) < interactionRange) {
+      alert("NOTE: " + note.userData.text);
+      notesInWorld.splice(i, 1);
+      scene.remove(note);
+      return;
+    }
+  }
+}
+
+// ✅ UPDATE OBJECTIVE
+function updateObjective(stage) {
+  objectiveStage = stage;
+  
+  const stages = [
+    "Find the Mansion Key",
+    "Reach the Mansion",
+    "Unlock the Door",
+    "Escape the Island"
+  ];
+  
+  currentObjective = stages[stage] || stages[0];
+  updateObjectiveUI();
 }
 
 function updateGravity(delta) {
@@ -481,6 +812,7 @@ function triggerJumpscare() {
   if (document.exitPointerLock) document.exitPointerLock();
 
   camera.lookAt(enemy.position.x, enemy.position.y + 7, enemy.position.z);
+  playSound("jumpscare");
 
   setTimeout(() => {
     showGameOver();
@@ -592,6 +924,8 @@ function jump() {
   if (!isJumping && !paused) {
     velocityY = 7;
     isJumping = true;
+    playSound("footstep");
+    lastPlayerSound = { time: Date.now(), type: "jump" };
   }
 }
 
@@ -606,6 +940,7 @@ function keyDown(e) {
   if (e.code === "Space") jump();
   if (key === "f") toggleTorch();
   if (key === "p") togglePause();
+  if (key === "e") handleInteraction();
 }
 
 function keyUp(e) {
@@ -632,19 +967,56 @@ function togglePause() {
 }
 
 function toggleTorch() {
-  torchOn = !torchOn;
-  if (torchLight) torchLight.intensity = torchOn ? 5 : 0;
+  if (battery > 0) {
+    torchOn = !torchOn;
+    if (torchLight) torchLight.intensity = torchOn ? 5 : 0;
 
-  const torchBtn = document.getElementById("torchBtn");
-  if (torchBtn) torchBtn.innerHTML = torchOn ? "Torch ON" : "Torch";
+    const torchBtn = document.getElementById("torchBtn");
+    if (torchBtn) torchBtn.innerHTML = torchOn ? "Torch ON" : "Torch";
+  }
 }
 
 function updateHealthUI() {
   const healthValue = document.getElementById("healthValue");
   const healthFill = document.getElementById("healthFill");
 
-  if (healthValue) healthValue.innerText = health;
+  if (healthValue) healthValue.innerText = Math.ceil(health);
   if (healthFill) healthFill.style.width = health + "%";
+
+  if (health < 30) {
+    document.getElementById("gameUI").classList.add("low-health");
+  } else {
+    document.getElementById("gameUI").classList.remove("low-health");
+  }
+}
+
+// ✅ STAMINA UI
+function updateStaminaUI() {
+  const staminaFill = document.getElementById("staminaFill");
+  if (staminaFill) staminaFill.style.width = stamina + "%";
+}
+
+// ✅ BATTERY UI
+function updateBatteryUI() {
+  const torchIndicator = document.getElementById("torchIndicator");
+  if (torchIndicator) {
+    if (torchOn) {
+      battery = Math.max(0, battery - 0.1);
+      if (battery <= 0) {
+        torchOn = false;
+        if (torchLight) torchLight.intensity = 0;
+      }
+      torchIndicator.innerText = "Torch: ON (" + Math.ceil(battery) + "%)";
+    } else {
+      torchIndicator.innerText = "Torch: OFF (" + Math.ceil(battery) + "%)";
+    }
+  }
+}
+
+// ✅ OBJECTIVE UI
+function updateObjectiveUI() {
+  const objectiveText = document.getElementById("objectiveText");
+  if (objectiveText) objectiveText.innerText = currentObjective;
 }
 
 function damagePlayer(amount) {
@@ -693,8 +1065,9 @@ function animate() {
     updateGravity(delta);
     updateEnemyAI(delta);
     handleCollisions();
+    updateStaminaUI();
+    updateBatteryUI();
   }
 
   renderer.render(scene, camera);
 }
-```
