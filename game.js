@@ -1,8 +1,3 @@
-Bhai, ye **full final `game.js`** copy-paste karo. Isme world, terrain, FPS player, collision, ghost enemy AI, patrol/chase/jumpscare sab add hai.
-
-`index.html` me change tabhi chahiye agar usme `gameUI`, `gameOver`, `victory`, `healthValue`, `healthFill`, `pauseBtn`, `torchBtn`, `runBtn` IDs nahi hain. Agar tumne mera previous index use kiya hai, to kuch change nahi chahiye.
-
-```js
 let scene, camera, renderer, clock;
 let player, torchLight, enemy;
 let gameStarted = false;
