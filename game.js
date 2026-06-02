@@ -1,6 +1,6 @@
 // ============================================
 // THREE.JS HORROR GAME - PROPERLY ORGANIZED
-// Converted from Night to Day Scene
+// Converted from Night to Day Scene with Granny Enemy
 // ============================================
 
 // ========== GAME STATE MANAGER ==========
@@ -36,6 +36,8 @@ const GameState = {
   enemyPauseTimer: 0,
   enemyInvestigating: false,
   investigateTimer: 0,
+  lastDetectionTime: 0,
+  attackCooldown: 0,
 
   // Danger system
   dangerLevel: 0,
@@ -68,17 +70,30 @@ const WORLD = {
   ESCAPE_POINT: new THREE.Vector3(0, 0, 500)
 };
 
+// ========== GRANNY AI CONSTANTS ==========
+const GRANNY = {
+  DETECTION_RANGE: 15, // Can see player within 15 units
+  CHASE_RANGE: 20, // Chase range
+  ATTACK_RANGE: 3, // Attack range
+  PATROL_SPEED: 4,
+  CHASE_SPEED: 9,
+  ATTACK_DAMAGE: 15, // Damage per attack
+  ATTACK_COOLDOWN: 1.5, // Seconds between attacks
+  VISION_CONE_ANGLE: 120 // Degrees
+};
+
 // ========== THREE.JS OBJECTS ==========
 let scene, camera, renderer, clock;
-let player, torchLight, enemy;
+let player, torchLight, granny;
 let mansionDoor, shadowFigure, keyPickup;
 let notesInWorld = [];
 let colliders = [];
 
 // ========== SAFE POSITION TRACKING ==========
 let lastSafePosition = new THREE.Vector3();
-let enemyTarget = new THREE.Vector3();
+let grannyTarget = new THREE.Vector3();
 let investigateTarget = new THREE.Vector3();
+let grannyTexture = null;
 
 // ============================================
 // INITIALIZATION
@@ -140,6 +155,9 @@ function initGame() {
   // ========== LIGHTING - DAY SCENE ==========
   setupDayLighting();
 
+  // ========== LOAD GRANNY TEXTURE ==========
+  loadGrannyTexture();
+
   // ========== CREATE WORLD ==========
   createWorld();
 
@@ -162,6 +180,20 @@ function initGame() {
   updateBatteryUI();
   updateObjectiveUI();
   updateInventoryUI();
+}
+
+// ============================================
+// GRANNY TEXTURE LOADING
+// ============================================
+
+function loadGrannyTexture() {
+  const textureLoader = new THREE.TextureLoader();
+  
+  // ✅ LOAD GRANNY PNG TEXTURE
+  textureLoader.load('GrannyG1New.png', (texture) => {
+    grannyTexture = texture;
+    texture.transparent = true;
+  });
 }
 
 function setupDayLighting() {
@@ -351,6 +383,17 @@ function playSound(soundName) {
     case "tree_creak":
       createSound(140, 0.8, "sine");
       break;
+    case "granny_attack":
+      createSound(250, 0.6, "sine");
+      createSound(150, 0.6, "square");
+      break;
+    case "granny_scream":
+      createSound(300, 1.0, "sine");
+      createSound(200, 1.0, "square");
+      break;
+    case "damage":
+      createSound(100, 0.4, "sine");
+      break;
   }
 }
 
@@ -369,7 +412,7 @@ function createWorld() {
   createMansion();
   createForest();
   createRocks();
-  createEnemy();
+  createGranny();
   createKey();
   createNotes();
   createShadowFigure();
@@ -598,177 +641,227 @@ function createNotes() {
 }
 
 // ============================================
-// ENEMY AI SYSTEM
+// GRANNY ENEMY SYSTEM
 // ============================================
 
-function createEnemy() {
-  enemy = new THREE.Group();
+function createGranny() {
+  granny = new THREE.Group();
 
-  const body = new THREE.Mesh(
-    new THREE.CylinderGeometry(1.5, 2.2, 8, 12),
-    new THREE.MeshStandardMaterial({
-      color: 0xD8D8D8,
+  // ✅ CREATE GRANNY WITH TEXTURE OR FALLBACK GEOMETRY
+  if (grannyTexture) {
+    // ✅ GRANNY WITH TEXTURE
+    const grannyGeometry = new THREE.PlaneGeometry(3, 4);
+    const grannyMaterial = new THREE.MeshBasicMaterial({
+      map: grannyTexture,
       transparent: true,
-      opacity: 0.78
-    })
-  );
-  body.position.y = 4;
-  enemy.add(body);
+      side: THREE.DoubleSide
+    });
+    const grannySprite = new THREE.Mesh(grannyGeometry, grannyMaterial);
+    granny.add(grannySprite);
+  } else {
+    // ✅ FALLBACK GEOMETRY
+    const body = new THREE.Mesh(
+      new THREE.CylinderGeometry(1.2, 1.5, 5, 12),
+      new THREE.MeshStandardMaterial({
+        color: 0xB8956A,
+        transparent: true,
+        opacity: 0.9
+      })
+    );
+    body.position.y = 2.5;
+    granny.add(body);
 
-  const head = new THREE.Mesh(
-    new THREE.SphereGeometry(1.55, 16, 16),
-    new THREE.MeshStandardMaterial({ color: 0xF0F0F0 })
-  );
-  head.position.y = 9;
-  enemy.add(head);
+    const head = new THREE.Mesh(
+      new THREE.SphereGeometry(1.2, 16, 16),
+      new THREE.MeshStandardMaterial({ color: 0xD4A574 })
+    );
+    head.position.y = 6;
+    granny.add(head);
 
-  const eyeMat = new THREE.MeshBasicMaterial({ color: 0xFF1111 });
-  const eye1 = new THREE.Mesh(new THREE.SphereGeometry(0.18, 8, 8), eyeMat);
-  const eye2 = eye1.clone();
-  eye1.position.set(-0.45, 9.2, -1.25);
-  eye2.position.set(0.45, 9.2, -1.25);
-  enemy.add(eye1, eye2);
+    // ✅ GRANNY'S EYES
+    const eyeMat = new THREE.MeshBasicMaterial({ color: 0x333333 });
+    const eye1 = new THREE.Mesh(new THREE.SphereGeometry(0.2, 8, 8), eyeMat);
+    const eye2 = eye1.clone();
+    eye1.position.set(-0.35, 6.3, -0.9);
+    eye2.position.set(0.35, 6.3, -0.9);
+    granny.add(eye1, eye2);
+  }
 
-  enemy.position.set(90, getTerrainHeight(90, -250), -250);
-  enemy.userData.speed = 5;
-  enemy.userData.lastKnownPlayerPos = new THREE.Vector3();
-  enemy.userData.canSeePlayer = false;
-  scene.add(enemy);
-  pickEnemyPatrolTarget();
+  granny.position.set(80, getTerrainHeight(80, -200), -200);
+  granny.userData.speed = GRANNY.PATROL_SPEED;
+  granny.userData.lastKnownPlayerPos = new THREE.Vector3();
+  granny.userData.canSeePlayer = false;
+  granny.userData.isAttacking = false;
+  scene.add(granny);
+  pickGrannyPatrolTarget();
 }
 
 function detectPlayer() {
-  const distance = enemy.position.distanceTo(player.position);
+  const distance = granny.position.distanceTo(player.position);
 
-  if (distance < 50) return true;
+  // ✅ CLOSE RANGE DETECTION (Always detects if too close)
+  if (distance < GRANNY.DETECTION_RANGE * 0.5) return true;
 
-  const toPlayer = new THREE.Vector3().subVectors(player.position, enemy.position);
+  // ✅ VISION CONE DETECTION
+  const toPlayer = new THREE.Vector3().subVectors(player.position, granny.position);
   toPlayer.y = 0;
 
-  if (toPlayer.length() < 100) {
+  if (toPlayer.length() < GRANNY.DETECTION_RANGE) {
     toPlayer.normalize();
-    const enemyForward = new THREE.Vector3(0, 0, -1).applyQuaternion(
-      enemy.quaternion
+    const grannyForward = new THREE.Vector3(0, 0, -1).applyQuaternion(
+      granny.quaternion
     );
-    enemyForward.y = 0;
-    enemyForward.normalize();
+    grannyForward.y = 0;
+    grannyForward.normalize();
 
-    if (enemyForward.dot(toPlayer) > 0.4) return true;
+    // ✅ CHECK IF PLAYER IS IN VISION CONE (120 degrees)
+    const visionCone = (GRANNY.VISION_CONE_ANGLE * Math.PI) / 180 / 2;
+    if (grannyForward.dot(toPlayer) > Math.cos(visionCone)) return true;
   }
 
-  if (GameState.lastPlayerSound.type === "footstep" && distance < 60) return true;
-  if (GameState.lastPlayerSound.type === "run" && distance < 80) return true;
-  if (GameState.lastPlayerSound.type === "jump" && distance < 70) return true;
+  // ✅ SOUND DETECTION
+  if (GameState.lastPlayerSound.type === "footstep" && distance < GRANNY.DETECTION_RANGE * 1.2) return true;
+  if (GameState.lastPlayerSound.type === "run" && distance < GRANNY.DETECTION_RANGE * 1.5) return true;
+  if (GameState.lastPlayerSound.type === "jump" && distance < GRANNY.DETECTION_RANGE * 1.3) return true;
 
   return false;
 }
 
-function updateEnemyAI(delta) {
-  if (!enemy || GameState.jumpscareStarted) return;
+function updateGrannyAI(delta) {
+  if (!granny || GameState.jumpscareStarted) return;
 
-  const distance = enemy.position.distanceTo(player.position);
+  const distance = granny.position.distanceTo(player.position);
 
-  if (distance < 3) {
-    triggerJumpscare();
+  // ✅ COOLDOWN FOR ATTACK
+  if (GameState.attackCooldown > 0) {
+    GameState.attackCooldown -= delta;
+  }
+
+  // ✅ KILL CHECK - ATTACK IN RANGE
+  if (distance < GRANNY.ATTACK_RANGE) {
+    if (GameState.attackCooldown <= 0) {
+      attackPlayer();
+      GameState.attackCooldown = GRANNY.ATTACK_COOLDOWN;
+    }
+    GameState.enemyState = "attack";
     return;
   }
 
+  // ✅ DETECTION FLOW
   if (GameState.enemyState !== "chase" && detectPlayer()) {
     GameState.enemyState = "chase";
+    GameState.lastDetectionTime = Date.now();
     playSound("chase_music");
+    playSound("granny_scream");
   }
 
-  if (GameState.enemyState === "chase" && distance > 120) {
+  // ✅ CHASE TO INVESTIGATE
+  if (GameState.enemyState === "chase" && distance > GRANNY.CHASE_RANGE) {
     GameState.enemyState = "investigate";
-    enemy.userData.lastKnownPlayerPos.copy(player.position);
+    granny.userData.lastKnownPlayerPos.copy(player.position);
     GameState.enemyInvestigating = true;
     GameState.investigateTimer = 8;
   }
 
+  // ✅ INVESTIGATE TO PATROL
   if (GameState.enemyState === "investigate" && GameState.investigateTimer <= 0) {
     GameState.enemyState = "patrol";
     GameState.enemyInvestigating = false;
-    pickEnemyPatrolTarget();
+    pickGrannyPatrolTarget();
   }
 
+  // ✅ INVESTIGATE TIMER
   if (GameState.enemyInvestigating) {
     GameState.investigateTimer -= delta;
   }
 
-  if (GameState.enemyState === "patrol") patrolEnemy(delta);
-  if (GameState.enemyState === "investigate") investigateEnemy(delta);
+  // ✅ STATES
+  if (GameState.enemyState === "patrol") patrolGranny(delta);
+  if (GameState.enemyState === "investigate") investigateGranny(delta);
   if (GameState.enemyState === "chase") chasePlayer(delta);
 
-  enemy.position.y = getTerrainHeight(enemy.position.x, enemy.position.z);
+  granny.position.y = getTerrainHeight(granny.position.x, granny.position.z) + 0.5;
   updateDangerLevel(distance);
 
+  // ✅ RANDOM SOUNDS
   if (Math.random() < 0.001 && GameState.enemyState === "patrol") {
     playRandomHorrorSound();
   }
 }
 
-function investigateEnemy(delta) {
-  const investigatePos = enemy.userData.lastKnownPlayerPos;
-  const dist = enemy.position.distanceTo(investigatePos);
+function investigateGranny(delta) {
+  const investigatePos = granny.userData.lastKnownPlayerPos;
+  const dist = granny.position.distanceTo(investigatePos);
 
   if (dist < 12) {
     if (Math.random() > 0.7) {
-      pickEnemyPatrolTarget();
+      pickGrannyPatrolTarget();
       GameState.enemyState = "patrol";
       GameState.enemyInvestigating = false;
     }
     return;
   }
 
-  const dir = new THREE.Vector3().subVectors(investigatePos, enemy.position);
+  const dir = new THREE.Vector3().subVectors(investigatePos, granny.position);
   dir.y = 0;
   dir.normalize();
 
-  enemy.position.addScaledVector(dir, 7 * delta);
-  enemy.lookAt(investigatePos.x, enemy.position.y, investigatePos.z);
-  avoidEnemyHardClip();
+  granny.position.addScaledVector(dir, GRANNY.PATROL_SPEED * 1.5 * delta);
+  granny.lookAt(investigatePos.x, granny.position.y, investigatePos.z);
+  avoidGrannyHardClip();
 }
 
-function patrolEnemy(delta) {
+function patrolGranny(delta) {
   GameState.enemyPauseTimer -= delta;
   if (GameState.enemyPauseTimer > 0) return;
 
-  const dir = new THREE.Vector3().subVectors(enemyTarget, enemy.position);
+  const dir = new THREE.Vector3().subVectors(grannyTarget, granny.position);
   dir.y = 0;
 
   if (dir.length() < 8) {
     GameState.enemyPauseTimer = 2 + Math.random() * 3;
-    pickEnemyPatrolTarget();
+    pickGrannyPatrolTarget();
     return;
   }
 
   dir.normalize();
-  enemy.position.addScaledVector(dir, 5 * delta);
-  enemy.lookAt(
-    enemy.position.x + dir.x,
-    enemy.position.y,
-    enemy.position.z + dir.z
+  granny.position.addScaledVector(dir, GRANNY.PATROL_SPEED * delta);
+  granny.lookAt(
+    granny.position.x + dir.x,
+    granny.position.y,
+    granny.position.z + dir.z
   );
-  avoidEnemyHardClip();
+  avoidGrannyHardClip();
 }
 
 function chasePlayer(delta) {
-  const dir = new THREE.Vector3().subVectors(player.position, enemy.position);
+  const dir = new THREE.Vector3().subVectors(player.position, granny.position);
   dir.y = 0;
   dir.normalize();
 
-  enemy.position.addScaledVector(dir, 11 * delta);
-  enemy.lookAt(player.position.x, enemy.position.y, player.position.z);
-  avoidEnemyHardClip();
+  granny.position.addScaledVector(dir, GRANNY.CHASE_SPEED * delta);
+  granny.lookAt(player.position.x, granny.position.y, player.position.z);
+  avoidGrannyHardClip();
 }
 
-function pickEnemyPatrolTarget() {
-  enemyTarget.set(
+function attackPlayer() {
+  const distance = granny.position.distanceTo(player.position);
+  
+  if (distance < GRANNY.ATTACK_RANGE + 2) {
+    playSound("granny_attack");
+    damagePlayer(GRANNY.ATTACK_DAMAGE);
+    
+    console.log(`🔴 GRANNY ATTACKED! Health: ${GameState.health}`);
+  }
+}
+
+function pickGrannyPatrolTarget() {
+  grannyTarget.set(
     Math.random() * WORLD.WIDTH - WORLD.WIDTH / 2,
     0,
     Math.random() * WORLD.DEPTH - WORLD.DEPTH / 2
   );
-  enemyTarget.y = getTerrainHeight(enemyTarget.x, enemyTarget.z);
+  grannyTarget.y = getTerrainHeight(grannyTarget.x, grannyTarget.z);
 }
 
 // ============================================
@@ -1052,17 +1145,17 @@ function handleCollisions() {
   }
 }
 
-function avoidEnemyHardClip() {
+function avoidGrannyHardClip() {
   for (const col of colliders) {
-    const dx = enemy.position.x - col.x;
-    const dz = enemy.position.z - col.z;
+    const dx = granny.position.x - col.x;
+    const dz = granny.position.z - col.z;
     const distSq = dx * dx + dz * dz;
     const minDist = 2.3 + col.r;
 
     if (distSq < minDist * minDist) {
       const dist = Math.sqrt(distSq) || 0.01;
-      enemy.position.x = col.x + (dx / dist) * minDist;
-      enemy.position.z = col.z + (dz / dist) * minDist;
+      granny.position.x = col.x + (dx / dist) * minDist;
+      granny.position.z = col.z + (dz / dist) * minDist;
     }
   }
 }
@@ -1263,6 +1356,11 @@ function updateHealthUI() {
   } else {
     document.getElementById("gameUI").classList.remove("low-health");
   }
+
+  // ✅ AUTO GAME OVER IF HEALTH REACHES 0
+  if (GameState.health <= 0) {
+    showGameOver();
+  }
 }
 
 function updateStaminaUI() {
@@ -1299,28 +1397,22 @@ function updateInventoryUI() {
 // GAME OVER & VICTORY
 // ============================================
 
-function triggerJumpscare() {
-  GameState.jumpscareStarted = true;
-  GameState.paused = true;
-
-  if (document.exitPointerLock) document.exitPointerLock();
-
-  camera.lookAt(enemy.position.x, enemy.position.y + 7, enemy.position.z);
-  playSound("jumpscare");
-
-  setTimeout(() => {
-    showGameOver();
-  }, 450);
-}
-
 function showGameOver() {
+  if (GameState.paused) return; // Prevent multiple calls
+  
   GameState.paused = true;
+  GameState.jumpscareStarted = true;
   document.getElementById("gameUI").style.display = "none";
   document.getElementById("gameOver").style.display = "flex";
   if (document.exitPointerLock) document.exitPointerLock();
+  
+  playSound("jumpscare");
+  console.log("💀 GAME OVER! Granny caught you!");
 }
 
 function showVictory() {
+  if (GameState.paused) return; // Prevent multiple calls
+  
   GameState.paused = true;
   document.getElementById("gameUI").style.display = "none";
   document.getElementById("victory").style.display = "flex";
@@ -1336,8 +1428,19 @@ function showVictory() {
 
 function damagePlayer(amount) {
   GameState.health = Math.max(0, GameState.health - amount);
+  playSound("damage");
   updateHealthUI();
-  if (GameState.health <= 0) showGameOver();
+  
+  // ✅ FLASH EFFECT ON DAMAGE
+  const gameUI = document.getElementById("gameUI");
+  gameUI.style.filter = "brightness(0.7)";
+  setTimeout(() => {
+    gameUI.style.filter = "brightness(1)";
+  }, 200);
+
+  if (GameState.health <= 0) {
+    showGameOver();
+  }
 }
 
 function restartGame() {
@@ -1368,7 +1471,7 @@ function animate() {
   if (!GameState.paused) {
     updatePlayer(delta);
     updateGravity(delta);
-    updateEnemyAI(delta);
+    updateGrannyAI(delta);
     updateHorrorEvents(delta);
     handleCollisions();
     updateStaminaUI();
