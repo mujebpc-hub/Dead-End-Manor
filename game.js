@@ -35,7 +35,8 @@ let jumpscareStarted = false;
 let inventory = {
   key: false,
   batteries: 0,
-  notes: []
+  notes: [],
+  notesCollected: 0
 };
 
 // ✅ OBJECTIVE SYSTEM
@@ -57,15 +58,23 @@ let investigateTimer = 0;
 // ✅ MANSION ENTRY
 let mansionDoor = null;
 let doorUnlocked = false;
+let doorOpen = false;
 let escapePoint = new THREE.Vector3(0, 0, 500);
+let mansionInterior = null;
 
 // ✅ KEY & ITEMS
 let keyPickup = null;
 let notesInWorld = [];
 
-// ✅ RANDOM HORROR EVENTS
+// ✅ HORROR EVENTS
 let horrorEventTimer = 0;
 let lastHorrorEvent = 0;
+let shadowFigure = null;
+
+// ✅ MARKERS & INDICATORS
+let keyMarker = null;
+let mansionMarker = null;
+let escapeMarker = null;
 
 function startGame() {
   document.getElementById("home").style.display = "none";
@@ -120,7 +129,7 @@ function createSound(name, frequency, duration, type = "sine") {
   osc.stop(audioContext.currentTime + duration);
 }
 
-// ✅ PLAY SOUNDS
+// ✅ PLAY SOUNDS - EXPANDED
 function playSound(soundName) {
   if (!audioContext) return;
 
@@ -148,15 +157,36 @@ function playSound(soundName) {
     case "ghost_whisper":
       createSound("whisper", 120, 0.4, "sine");
       break;
+    // ✅ NEW HORROR SOUNDS
+    case "distant_scream":
+      createSound("scream", 180, 1.2, "sine");
+      break;
+    case "wind":
+      createSound("wind", 80, 2, "sine");
+      break;
+    case "tree_creak":
+      createSound("creak", 140, 0.8, "sine");
+      break;
   }
+}
+
+// ✅ PLAY RANDOM HORROR SOUNDS
+function playRandomHorrorSound() {
+  const sounds = ["ghost_whisper", "distant_scream", "wind", "tree_creak"];
+  const randomSound = sounds[Math.floor(Math.random() * sounds.length)];
+  playSound(randomSound);
 }
 
 function init() {
   clock = new THREE.Clock();
   scene = new THREE.Scene();
+  
   // ✅ DARK BLUE-BLACK SKY FOR MOONLIT NIGHT
   scene.background = new THREE.Color(0x0a0f1f);
-  scene.fog = new THREE.Fog(0x0f1729, 45, 260);
+  scene.fog = new THREE.Fog(0x1a2a4a, 80, 350); // ✅ Denser fog with blue tint
+  
+  // ✅ ADD STARS TO SKY
+  createStars();
 
   camera = new THREE.PerspectiveCamera(
     75,
@@ -171,31 +201,42 @@ function init() {
   renderer.shadowMap.enabled = true;
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
-  renderer.toneMappingExposure = 0.95;
+  renderer.toneMappingExposure = 1.0;
   document.body.appendChild(renderer.domElement);
 
   // ✅ ENHANCED MOONLIGHT - BLUISH AMBIENT
-  scene.add(new THREE.AmbientLight(0x4a5f8f, 0.35));
+  scene.add(new THREE.AmbientLight(0x4a5f8f, 0.4));
 
   // ✅ MOON DIRECTIONAL LIGHT - BRIGHT MOONLIGHT
-  const moon = new THREE.DirectionalLight(0xb8d5ff, 1.3);
-  moon.position.set(-150, 220, 120);
+  const moon = new THREE.DirectionalLight(0xc8deff, 1.4);
+  moon.position.set(-200, 280, 150);
   moon.castShadow = true;
   moon.shadow.mapSize.set(4096, 4096);
   moon.shadow.camera.near = 0.5;
-  moon.shadow.camera.far = 500;
-  moon.shadow.camera.left = -300;
-  moon.shadow.camera.right = 300;
-  moon.shadow.camera.top = 300;
-  moon.shadow.camera.bottom = -300;
+  moon.shadow.camera.far = 600;
+  moon.shadow.camera.left = -400;
+  moon.shadow.camera.right = 400;
+  moon.shadow.camera.top = 400;
+  moon.shadow.camera.bottom = -400;
   scene.add(moon);
 
   // ✅ VISUAL MOON IN SKY
-  const moonGeometry = new THREE.SphereGeometry(40, 32, 32);
-  const moonMaterial = new THREE.MeshBasicMaterial({ color: 0xe8f0ff });
+  const moonGeometry = new THREE.SphereGeometry(50, 32, 32);
+  const moonMaterial = new THREE.MeshBasicMaterial({ color: 0xf0f8ff });
   const moonMesh = new THREE.Mesh(moonGeometry, moonMaterial);
-  moonMesh.position.set(-150, 400, -300);
+  moonMesh.position.set(-200, 500, -500);
   scene.add(moonMesh);
+
+  // ✅ MOON GLOW
+  const glowGeometry = new THREE.SphereGeometry(60, 32, 32);
+  const glowMaterial = new THREE.MeshBasicMaterial({
+    color: 0xb8d5ff,
+    transparent: true,
+    opacity: 0.1
+  });
+  const moonGlow = new THREE.Mesh(glowGeometry, glowMaterial);
+  moonGlow.position.copy(moonMesh.position);
+  scene.add(moonGlow);
 
   createWorld();
 
@@ -208,14 +249,15 @@ function init() {
   camera.position.set(0, eyeHeight, 0);
   camera.rotation.order = "YXZ";
 
-  // ✅ ENHANCED TORCH - BRIGHTER & WIDER BEAM
-  torchLight = new THREE.SpotLight(0xffffff, 0, 180, Math.PI / 5, 0.45, 1.8);
+  // ✅ ENHANCED TORCH - NO BATTERY DRAIN, VERY POWERFUL
+  torchLight = new THREE.SpotLight(0xffffff, 0, 200, Math.PI / 4.5, 0.5, 2);
   torchLight.shadow.mapSize.set(2048, 2048);
   torchLight.shadow.camera.near = 0.1;
-  torchLight.shadow.camera.far = 180;
+  torchLight.shadow.camera.far = 200;
   camera.add(torchLight);
   camera.add(torchLight.target);
   torchLight.target.position.set(0, 0, -1);
+  torchOn = true; // ✅ TORCH STARTS ON
 
   window.addEventListener("keydown", keyDown);
   window.addEventListener("keyup", keyUp);
@@ -230,6 +272,33 @@ function init() {
   updateStaminaUI();
   updateBatteryUI();
   updateObjectiveUI();
+  updateInventoryUI();
+  
+  // ✅ SET INITIAL TORCH STATE
+  if (torchLight) torchLight.intensity = 9;
+}
+
+// ✅ CREATE STARS IN SKY
+function createStars() {
+  const starsGeometry = new THREE.BufferGeometry();
+  const starsMaterial = new THREE.PointsMaterial({
+    color: 0xffffff,
+    size: 2,
+    transparent: true,
+    opacity: 0.8
+  });
+
+  const starsVertices = [];
+  for (let i = 0; i < 200; i++) {
+    const x = (Math.random() - 0.5) * 2000;
+    const y = Math.random() * 800 + 300;
+    const z = (Math.random() - 0.5) * 2000;
+    starsVertices.push(x, y, z);
+  }
+
+  starsGeometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array(starsVertices), 3));
+  const stars = new THREE.Points(starsGeometry, starsMaterial);
+  scene.add(stars);
 }
 
 function createWorld() {
@@ -240,6 +309,7 @@ function createWorld() {
   createEnemy();
   createKey();
   createNotes();
+  createShadowFigure();
 }
 
 function getTerrainHeight(x, z) {
@@ -297,13 +367,14 @@ function createMansion() {
   scene.add(mansion);
   addBoxCollider(mansion);
 
-  // ✅ MANSION DOOR
+  // ✅ MANSION DOOR WITH ANIMATION
   mansionDoor = new THREE.Mesh(
     new THREE.BoxGeometry(9, 15, 1.5),
     new THREE.MeshStandardMaterial({ color: 0x151515 })
   );
   mansionDoor.position.set(0, getTerrainHeight(0, -389) + 7.5, -389);
   mansionDoor.userData.type = "door";
+  mansionDoor.userData.originalRotation = 0;
   scene.add(mansionDoor);
   addBoxCollider(mansionDoor);
 
@@ -315,6 +386,29 @@ function createMansion() {
   tower.castShadow = true;
   scene.add(tower);
   addBoxCollider(tower);
+
+  // ✅ MANSION INTERIOR (BASEMENT/ROOMS)
+  createMansionInterior(mansion.position);
+}
+
+// ✅ CREATE MANSION INTERIOR
+function createMansionInterior(mansionPos) {
+  mansionInterior = new THREE.Group();
+  
+  // Interior rooms below mansion
+  const room1 = new THREE.Mesh(
+    new THREE.BoxGeometry(20, 10, 20),
+    new THREE.MeshStandardMaterial({ color: 0x2a2a2a })
+  );
+  room1.position.set(mansionPos.x - 15, mansionPos.y - 20, mansionPos.z);
+  scene.add(room1);
+
+  const room2 = new THREE.Mesh(
+    new THREE.BoxGeometry(20, 10, 20),
+    new THREE.MeshStandardMaterial({ color: 0x3a3a3a })
+  );
+  room2.position.set(mansionPos.x + 15, mansionPos.y - 20, mansionPos.z);
+  scene.add(room2);
 }
 
 function createTree(x, z) {
@@ -367,6 +461,41 @@ function createRocks() {
     scene.add(rock);
     addCylinderCollider(x, z, size + 1);
   }
+}
+
+// ✅ CREATE SHADOW FIGURE (Horror event)
+function createShadowFigure() {
+  shadowFigure = new THREE.Group();
+  
+  const body = new THREE.Mesh(
+    new THREE.CylinderGeometry(1, 1.5, 6, 8),
+    new THREE.MeshStandardMaterial({
+      color: 0x1a1a1a,
+      transparent: true,
+      opacity: 0.3
+    })
+  );
+  body.position.y = 3;
+  shadowFigure.add(body);
+
+  const head = new THREE.Mesh(
+    new THREE.SphereGeometry(1, 8, 8),
+    new THREE.MeshStandardMaterial({
+      color: 0x0a0a0a,
+      transparent: true,
+      opacity: 0.3
+    })
+  );
+  head.position.y = 7;
+  shadowFigure.add(head);
+
+  shadowFigure.position.set(
+    Math.random() * 200 - 100,
+    getTerrainHeight(0, -200),
+    -200 + Math.random() * 100
+  );
+  shadowFigure.userData.visible = false;
+  scene.add(shadowFigure);
 }
 
 // ✅ CREATE KEY PICKUP
@@ -449,29 +578,30 @@ function detectPlayer() {
   const distance = enemy.position.distanceTo(player.position);
   
   // ✅ CLOSE DETECTION
-  if (distance < 40) return true;
+  if (distance < 50) return true;
 
-  // ✅ VISION CONE
+  // ✅ VISION CONE - IMPROVED
   const toPlayer = new THREE.Vector3().subVectors(player.position, enemy.position);
   toPlayer.y = 0;
 
-  if (toPlayer.length() < 75) {
+  if (toPlayer.length() < 100) {
     toPlayer.normalize();
     const enemyForward = new THREE.Vector3(0, 0, -1).applyQuaternion(enemy.quaternion);
     enemyForward.y = 0;
     enemyForward.normalize();
 
-    if (enemyForward.dot(toPlayer) > 0.45) return true;
+    if (enemyForward.dot(toPlayer) > 0.4) return true;
   }
 
-  // ✅ SOUND DETECTION
-  if (lastPlayerSound.type === "footstep" && distance < 50) return true;
-  if (lastPlayerSound.type === "jump" && distance < 60) return true;
+  // ✅ SOUND DETECTION - IMPROVED
+  if (lastPlayerSound.type === "footstep" && distance < 60) return true;
+  if (lastPlayerSound.type === "run" && distance < 80) return true;
+  if (lastPlayerSound.type === "jump" && distance < 70) return true;
 
   return false;
 }
 
-// ✅ BETTER ENEMY AI
+// ✅ SMARTER ENEMY AI
 function updateEnemyAI(delta) {
   if (!enemy || jumpscareStarted) return;
 
@@ -489,12 +619,24 @@ function updateEnemyAI(delta) {
     playSound("chase_music");
   }
 
-  // ✅ CHASE TO LOST
-  if (enemyState === "chase" && distance > 95) {
+  // ✅ CHASE TO INVESTIGATE - SMARTER
+  if (enemyState === "chase" && distance > 120) {
     enemyState = "investigate";
     enemy.userData.lastKnownPlayerPos.copy(player.position);
     enemyInvestigating = true;
-    investigateTimer = 5;
+    investigateTimer = 8;
+  }
+
+  // ✅ INVESTIGATE TO PATROL
+  if (enemyState === "investigate" && investigateTimer <= 0) {
+    enemyState = "patrol";
+    enemyInvestigating = false;
+    pickEnemyPatrolTarget();
+  }
+
+  // ✅ INVESTIGATE TIMER
+  if (enemyInvestigating) {
+    investigateTimer -= delta;
   }
 
   // ✅ STATES
@@ -504,17 +646,24 @@ function updateEnemyAI(delta) {
 
   enemy.position.y = getTerrainHeight(enemy.position.x, enemy.position.z);
   updateDangerLevel(distance);
+
+  // ✅ RANDOM FAKE SOUNDS INVESTIGATION
+  if (Math.random() < 0.001 && enemyState === "patrol") {
+    playRandomHorrorSound();
+  }
 }
 
-// ✅ INVESTIGATE STATE
+// ✅ SMARTER INVESTIGATE STATE
 function investigateEnemy(delta) {
   const investigatePos = enemy.userData.lastKnownPlayerPos;
   const dist = enemy.position.distanceTo(investigatePos);
 
-  if (dist < 8) {
-    enemyState = "patrol";
-    enemyInvestigating = false;
-    pickEnemyPatrolTarget();
+  if (dist < 12) {
+    if (Math.random() > 0.7) {
+      pickEnemyPatrolTarget();
+      enemyState = "patrol";
+      enemyInvestigating = false;
+    }
     return;
   }
 
@@ -522,7 +671,7 @@ function investigateEnemy(delta) {
   dir.y = 0;
   dir.normalize();
 
-  enemy.position.addScaledVector(dir, 6 * delta);
+  enemy.position.addScaledVector(dir, 7 * delta);
   enemy.lookAt(investigatePos.x, enemy.position.y, investigatePos.z);
   avoidEnemyHardClip();
 }
@@ -534,14 +683,14 @@ function patrolEnemy(delta) {
   const dir = new THREE.Vector3().subVectors(enemyTarget, enemy.position);
   dir.y = 0;
 
-  if (dir.length() < 4) {
-    enemyPauseTimer = 1 + Math.random() * 2;
+  if (dir.length() < 8) {
+    enemyPauseTimer = 2 + Math.random() * 3;
     pickEnemyPatrolTarget();
     return;
   }
 
   dir.normalize();
-  enemy.position.addScaledVector(dir, 4 * delta);
+  enemy.position.addScaledVector(dir, 5 * delta);
   enemy.lookAt(enemy.position.x + dir.x, enemy.position.y, enemy.position.z + dir.z);
   avoidEnemyHardClip();
 }
@@ -551,7 +700,7 @@ function chasePlayer(delta) {
   dir.y = 0;
   dir.normalize();
 
-  enemy.position.addScaledVector(dir, 10 * delta);
+  enemy.position.addScaledVector(dir, 11 * delta);
   enemy.lookAt(player.position.x, enemy.position.y, player.position.z);
   avoidEnemyHardClip();
 }
@@ -569,7 +718,7 @@ function pickEnemyPatrolTarget() {
 function updateDangerLevel(distance) {
   if (distance < 8) {
     dangerLevel = 3;
-    if (Math.random() > 0.8) playSound("heartbeat");
+    if (Math.random() > 0.7) playSound("heartbeat");
     applyDangerUI("critical");
   } else if (distance < 15) {
     dangerLevel = 2;
@@ -595,6 +744,44 @@ function applyDangerUI(level) {
   }
   if (level === "critical") {
     gameUI.classList.add("danger-shake");
+  }
+}
+
+// ✅ HORROR EVENTS
+function updateHorrorEvents(delta) {
+  horrorEventTimer -= delta;
+
+  if (horrorEventTimer <= 0) {
+    const eventType = Math.floor(Math.random() * 4);
+
+    if (eventType === 0 && shadowFigure && !shadowFigure.userData.visible) {
+      // Shadow figure appears in distance
+      shadowFigure.userData.visible = true;
+      shadowFigure.position.set(
+        Math.random() * 300 - 150,
+        getTerrainHeight(0, -200),
+        -200 + Math.random() * 150
+      );
+      setTimeout(() => {
+        shadowFigure.userData.visible = false;
+      }, 3000);
+    } else if (eventType === 1) {
+      // Whisper near player
+      playSound("ghost_whisper");
+    } else if (eventType === 2) {
+      // Light flicker
+      if (torchOn && Math.random() > 0.5) {
+        torchLight.intensity = 3;
+        setTimeout(() => {
+          torchLight.intensity = 9;
+        }, 200);
+      }
+    } else if (eventType === 3) {
+      // Random horror sound
+      playRandomHorrorSound();
+    }
+
+    horrorEventTimer = 15 + Math.random() * 20;
   }
 }
 
@@ -627,13 +814,13 @@ function updatePlayer(delta) {
     direction.addScaledVector(forward, -joyY);
   }
 
-  // ✅ STAMINA CHECK - SLOWER DRAIN (takes longer to run out)
+  // ✅ STAMINA - MUCH SLOWER DRAIN (can run 30+ seconds)
   if (running && direction.lengthSq() > 0) {
-    stamina = Math.max(0, stamina - 0.15); // ✅ SLOWER DRAIN (reduced from 0.5)
+    stamina = Math.max(0, stamina - 0.08); // ✅ Very slow drain
     if (stamina <= 0) running = false;
-    playSound("footstep");
+    if (Math.random() > 0.8) playSound("footstep");
   } else {
-    stamina = Math.min(100, stamina + 0.25); // ✅ FASTER RECOVERY
+    stamina = Math.min(100, stamina + 0.3); // ✅ Fast recovery
   }
 
   if (direction.lengthSq() > 0) {
@@ -658,7 +845,7 @@ function updatePlayer(delta) {
   checkInteractions();
 }
 
-// ✅ INTERACTION CHECK
+// ✅ INTERACTION CHECK - IMPROVED
 function checkInteractions() {
   const interactionRange = 5;
   const interactionText = document.getElementById("interactionText");
@@ -709,7 +896,7 @@ function checkInteractions() {
   }
 }
 
-// ✅ INTERACTION HANDLER
+// ✅ INTERACTION HANDLER - IMPROVED
 function handleInteraction() {
   const interactionRange = 5;
 
@@ -720,17 +907,30 @@ function handleInteraction() {
       scene.remove(keyPickup);
       playSound("key_pickup");
       updateObjective(1);
+      updateInventoryUI();
       return;
     }
   }
 
-  // ✅ UNLOCK DOOR
+  // ✅ UNLOCK DOOR WITH ANIMATION
   if (mansionDoor && inventory.key && !doorUnlocked) {
     if (player.position.distanceTo(mansionDoor.position) < interactionRange) {
       doorUnlocked = true;
-      mansionDoor.material.color.setHex(0x3d3d3d);
       playSound("door_open");
       updateObjective(2);
+      
+      // ✅ DOOR OPENING ANIMATION
+      let angle = 0;
+      const animateOpen = setInterval(() => {
+        angle += 0.1;
+        mansionDoor.rotation.y = angle;
+        if (angle >= Math.PI / 2) {
+          clearInterval(animateOpen);
+          doorOpen = true;
+        }
+      }, 30);
+      
+      updateInventoryUI();
       return;
     }
   }
@@ -740,8 +940,10 @@ function handleInteraction() {
     const note = notesInWorld[i];
     if (player.position.distanceTo(note.position) < interactionRange) {
       alert("NOTE: " + note.userData.text);
+      inventory.notesCollected++;
       notesInWorld.splice(i, 1);
       scene.remove(note);
+      updateInventoryUI();
       return;
     }
   }
@@ -760,6 +962,20 @@ function updateObjective(stage) {
   
   currentObjective = stages[stage] || stages[0];
   updateObjectiveUI();
+}
+
+// ✅ UPDATE INVENTORY UI
+function updateInventoryUI() {
+  const invKey = document.getElementById("inventoryKey");
+  const invNotes = document.getElementById("inventoryNotes");
+
+  if (invKey) {
+    invKey.style.display = inventory.key ? "block" : "none";
+  }
+
+  if (invNotes) {
+    invNotes.innerText = "Notes: " + inventory.notesCollected;
+  }
 }
 
 function updateGravity(delta) {
@@ -987,14 +1203,12 @@ function togglePause() {
 }
 
 function toggleTorch() {
-  if (battery > 0) {
-    torchOn = !torchOn;
-    // ✅ INCREASED TORCH INTENSITY (brighter flash)
-    if (torchLight) torchLight.intensity = torchOn ? 8 : 0;
+  // ✅ TORCH ALWAYS ON - NO BATTERY DRAIN
+  torchOn = !torchOn;
+  if (torchLight) torchLight.intensity = torchOn ? 9 : 0;
 
-    const torchBtn = document.getElementById("torchBtn");
-    if (torchBtn) torchBtn.innerHTML = torchOn ? "Torch ON" : "Torch";
-  }
+  const torchBtn = document.getElementById("torchBtn");
+  if (torchBtn) torchBtn.innerHTML = torchOn ? "Torch ON" : "Torch OFF";
 }
 
 function updateHealthUI() {
@@ -1017,21 +1231,11 @@ function updateStaminaUI() {
   if (staminaFill) staminaFill.style.width = stamina + "%";
 }
 
-// ✅ BATTERY UI - VERY SLOW DRAIN (long lasting battery)
+// ✅ BATTERY UI - NO DRAIN (unlimited torch)
 function updateBatteryUI() {
   const torchIndicator = document.getElementById("torchIndicator");
   if (torchIndicator) {
-    if (torchOn) {
-      // ✅ VERY SLOW BATTERY DRAIN (reduced from 0.1 to 0.008)
-      battery = Math.max(0, battery - 0.008);
-      if (battery <= 0) {
-        torchOn = false;
-        if (torchLight) torchLight.intensity = 0;
-      }
-      torchIndicator.innerText = "Torch: ON (" + Math.ceil(battery) + "%)";
-    } else {
-      torchIndicator.innerText = "Torch: OFF (" + Math.ceil(battery) + "%)";
-    }
+    torchIndicator.innerText = torchOn ? "Torch: ON (∞)" : "Torch: OFF (∞)";
   }
 }
 
@@ -1054,11 +1258,21 @@ function showGameOver() {
   if (document.exitPointerLock) document.exitPointerLock();
 }
 
+// ✅ IMPROVED VICTORY SCREEN WITH CUTSCENE
 function showVictory() {
   paused = true;
   document.getElementById("gameUI").style.display = "none";
   document.getElementById("victory").style.display = "flex";
   if (document.exitPointerLock) document.exitPointerLock();
+
+  // ✅ PLAY VICTORY CUTSCENE
+  playSound("door_open");
+  
+  // Final ghost appearance
+  setTimeout(() => {
+    playSound("jumpscare");
+    alert("You escaped... but it follows you still...");
+  }, 2000);
 }
 
 function restartGame() {
@@ -1086,9 +1300,17 @@ function animate() {
     updatePlayer(delta);
     updateGravity(delta);
     updateEnemyAI(delta);
+    updateHorrorEvents(delta);
     handleCollisions();
     updateStaminaUI();
     updateBatteryUI();
+
+    // ✅ RENDER SHADOW FIGURE IF VISIBLE
+    if (shadowFigure && shadowFigure.userData.visible) {
+      shadowFigure.visible = true;
+    } else if (shadowFigure) {
+      shadowFigure.visible = false;
+    }
   }
 
   renderer.render(scene, camera);
