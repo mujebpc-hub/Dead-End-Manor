@@ -647,19 +647,21 @@ function createNotes() {
 function createGranny() {
   granny = new THREE.Group();
 
-  // ✅ CREATE GRANNY WITH TEXTURE OR FALLBACK GEOMETRY
+  // ✅ GRANNY WITH TEXTURE - PROPERLY DISPLAYED
   if (grannyTexture) {
-    // ✅ GRANNY WITH TEXTURE
-    const grannyGeometry = new THREE.PlaneGeometry(3, 4);
+    // ✅ GRANNY SPRITE FACING PLAYER (BILLBOARD STYLE)
+    const grannyGeometry = new THREE.PlaneGeometry(2.5, 4);
     const grannyMaterial = new THREE.MeshBasicMaterial({
       map: grannyTexture,
       transparent: true,
       side: THREE.DoubleSide
     });
     const grannySprite = new THREE.Mesh(grannyGeometry, grannyMaterial);
+    grannySprite.castShadow = true;
+    grannySprite.receiveShadow = true;
     granny.add(grannySprite);
   } else {
-    // ✅ FALLBACK GEOMETRY
+    // ✅ FALLBACK GEOMETRY (अगर texture नहीं मिले)
     const body = new THREE.Mesh(
       new THREE.CylinderGeometry(1.2, 1.5, 5, 12),
       new THREE.MeshStandardMaterial({
@@ -669,6 +671,7 @@ function createGranny() {
       })
     );
     body.position.y = 2.5;
+    body.castShadow = true;
     granny.add(body);
 
     const head = new THREE.Mesh(
@@ -676,6 +679,7 @@ function createGranny() {
       new THREE.MeshStandardMaterial({ color: 0xD4A574 })
     );
     head.position.y = 6;
+    head.castShadow = true;
     granny.add(head);
 
     // ✅ GRANNY'S EYES
@@ -782,6 +786,9 @@ function updateGrannyAI(delta) {
 
   granny.position.y = getTerrainHeight(granny.position.x, granny.position.z) + 0.5;
   updateDangerLevel(distance);
+
+  // ✅ GRANNY BILLBOARD - ALWAYS FACE PLAYER
+  granny.lookAt(player.position.x, granny.position.y, player.position.z);
 
   // ✅ RANDOM SOUNDS
   if (Math.random() < 0.001 && GameState.enemyState === "patrol") {
