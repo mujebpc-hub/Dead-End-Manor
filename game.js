@@ -190,7 +190,7 @@ function loadGrannyTexture() {
   const textureLoader = new THREE.TextureLoader();
   
   // ✅ LOAD GRANNY PNG TEXTURE
-  textureLoader.load('GrannyG1New.png', (texture) => {
+  textureLoader.load('textures/GrannyG1New.webp', (texture) => {
     grannyTexture = texture;
     texture.transparent = true;
   });
