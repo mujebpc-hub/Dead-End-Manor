@@ -640,56 +640,48 @@ function createNotes() {
   }
 }
 
-// ============================================
-// GRANNY ENEMY SYSTEM
-// ============================================
+// =========================
+// REAL GRANNY IMAGE SPRITE
+// =========================
 
-function createGranny() {
-  granny = new THREE.Group();
+const texture = new THREE.TextureLoader().load(
+  "textures/GrannyG1New.webp"
+);
 
-  // ✅ GRANNY WITH TEXTURE - PROPERLY DISPLAYED
-  if (grannyTexture) {
-    // ✅ GRANNY SPRITE FACING PLAYER (BILLBOARD STYLE)
-    const grannyGeometry = new THREE.PlaneGeometry(2.5, 4);
-    const grannyMaterial = new THREE.MeshBasicMaterial({
-      map: grannyTexture,
-      transparent: true,
-      side: THREE.DoubleSide
-    });
-    const grannySprite = new THREE.Mesh(grannyGeometry, grannyMaterial);
-    grannySprite.castShadow = true;
-    grannySprite.receiveShadow = true;
-    granny.add(grannySprite);
-  } else {
-    // ✅ FALLBACK GEOMETRY (अगर texture नहीं मिले)
-    const body = new THREE.Mesh(
-      new THREE.CylinderGeometry(1.2, 1.5, 5, 12),
-      new THREE.MeshStandardMaterial({
-        color: 0xB8956A,
-        transparent: true,
-        opacity: 0.9
-      })
-    );
-    body.position.y = 2.5;
-    body.castShadow = true;
-    granny.add(body);
+texture.colorSpace = THREE.SRGBColorSpace;
 
-    const head = new THREE.Mesh(
-      new THREE.SphereGeometry(1.2, 16, 16),
-      new THREE.MeshStandardMaterial({ color: 0xD4A574 })
-    );
-    head.position.y = 6;
-    head.castShadow = true;
-    granny.add(head);
+const grannyGeometry = new THREE.PlaneGeometry(4.5, 7);
 
-    // ✅ GRANNY'S EYES
-    const eyeMat = new THREE.MeshBasicMaterial({ color: 0x333333 });
-    const eye1 = new THREE.Mesh(new THREE.SphereGeometry(0.2, 8, 8), eyeMat);
-    const eye2 = eye1.clone();
-    eye1.position.set(-0.35, 6.3, -0.9);
-    eye2.position.set(0.35, 6.3, -0.9);
-    granny.add(eye1, eye2);
-  }
+const grannyMaterial = new THREE.MeshStandardMaterial({
+  map: texture,
+  transparent: true,
+  alphaTest: 0.5,
+  side: THREE.DoubleSide
+});
+
+const grannySprite = new THREE.Mesh(
+  grannyGeometry,
+  grannyMaterial
+);
+
+grannySprite.position.set(0, 3.5, 0);
+
+grannySprite.castShadow = true;
+grannySprite.receiveShadow = true;
+
+// AI body collision ke liye invisible collider
+const collider = new THREE.Mesh(
+  new THREE.CylinderGeometry(0.8, 0.8, 6, 8),
+  new THREE.MeshBasicMaterial({
+    transparent: true,
+    opacity: 0
+  })
+);
+
+collider.position.y = 3;
+
+granny.add(collider);
+granny.add(grannySprite);
 
   granny.position.set(80, getTerrainHeight(80, -200), -200);
   granny.userData.speed = GRANNY.PATROL_SPEED;
