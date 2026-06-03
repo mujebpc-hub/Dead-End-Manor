@@ -1,5 +1,5 @@
 // ============================================
-// THREE.JS HORROR GAME - PROPERLY ORGANIZED
+// THREE.JS HORROR GAME - PROPERLY ORGANIZED & FIXED
 // Converted from Night to Day Scene with Granny Enemy
 // ============================================
 
@@ -640,57 +640,61 @@ function createNotes() {
   }
 }
 
-// =========================
-// REAL GRANNY IMAGE SPRITE
-// =========================
+// ============================================
+// ✅ FIXED: GRANNY CREATION FUNCTION
+// ============================================
 
-const texture = new THREE.TextureLoader().load(
-  "textures/GrannyG1New.webp"
-);
+function createGranny() {
+  // ✅ Create granny group
+  granny = new THREE.Group();
 
-texture.colorSpace = THREE.SRGBColorSpace;
-
-const grannyGeometry = new THREE.PlaneGeometry(4.5, 7);
-
-const grannyMaterial = new THREE.MeshStandardMaterial({
-  map: texture,
-  transparent: true,
-  alphaTest: 0.5,
-  side: THREE.DoubleSide
-});
-
-const grannySprite = new THREE.Mesh(
-  grannyGeometry,
-  grannyMaterial
-);
-
-grannySprite.position.set(0, 3.5, 0);
-
-grannySprite.castShadow = true;
-grannySprite.receiveShadow = true;
-
-// AI body collision ke liye invisible collider
-const collider = new THREE.Mesh(
-  new THREE.CylinderGeometry(0.8, 0.8, 6, 8),
-  new THREE.MeshBasicMaterial({
+  // ✅ Wait for texture to load (use grannyTexture variable)
+  const grannyGeometry = new THREE.PlaneGeometry(4.5, 7);
+  
+  const grannyMaterial = new THREE.MeshStandardMaterial({
+    map: grannyTexture,  // ✅ Use already loaded texture
     transparent: true,
-    opacity: 0
-  })
-);
+    alphaTest: 0.5,
+    side: THREE.DoubleSide
+  });
 
-collider.position.y = 3;
+  // ✅ Create sprite
+  const grannySprite = new THREE.Mesh(grannyGeometry, grannyMaterial);
+  grannySprite.position.set(0, 3.5, 0);
+  grannySprite.castShadow = true;
+  grannySprite.receiveShadow = true;
 
-granny.add(collider);
-granny.add(grannySprite);
+  // ✅ Create invisible collision body
+  const collider = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.8, 0.8, 6, 8),
+    new THREE.MeshBasicMaterial({
+      transparent: true,
+      opacity: 0
+    })
+  );
+  collider.position.y = 3;
 
+  // ✅ Add children to granny group
+  granny.add(collider);
+  granny.add(grannySprite);
+
+  // ✅ Set position and stats
   granny.position.set(80, getTerrainHeight(80, -200), -200);
   granny.userData.speed = GRANNY.PATROL_SPEED;
   granny.userData.lastKnownPlayerPos = new THREE.Vector3();
   granny.userData.canSeePlayer = false;
   granny.userData.isAttacking = false;
+  
+  // ✅ Add to scene
   scene.add(granny);
+  
+  // ✅ Start patrol
   pickGrannyPatrolTarget();
 }
+
+// ============================================
+// GRANNY AI SYSTEM
+// ============================================
 
 function detectPlayer() {
   const distance = granny.position.distanceTo(player.position);
