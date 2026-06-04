@@ -72,14 +72,14 @@ const WORLD = {
 
 // ========== GRANNY AI CONSTANTS ==========
 const GRANNY = {
-  DETECTION_RANGE: 15,
-  CHASE_RANGE: 20,
-  ATTACK_RANGE: 3,
+  DETECTION_RANGE: 15, // Can see player within 15 units
+  CHASE_RANGE: 20, // Chase range
+  ATTACK_RANGE: 3, // Attack range
   PATROL_SPEED: 4,
   CHASE_SPEED: 9,
-  ATTACK_DAMAGE: 15,
-  ATTACK_COOLDOWN: 1.5,
-  VISION_CONE_ANGLE: 120
+  ATTACK_DAMAGE: 15, // Damage per attack
+  ATTACK_COOLDOWN: 1.5, // Seconds between attacks
+  VISION_CONE_ANGLE: 120 // Degrees
 };
 
 // ========== THREE.JS OBJECTS ==========
@@ -131,7 +131,7 @@ function initGame() {
   scene = new THREE.Scene();
 
   // ✅ BRIGHT DAY SKY
-  scene.background = new THREE.Color(0x87CEEB);
+  scene.background = new THREE.Color(0x87CEEB); // Sky blue
   scene.fog = new THREE.Fog(0xb0d0ff, 200, 800);
 
   // ========== CAMERA ==========
@@ -188,46 +188,39 @@ function initGame() {
 
 function loadGrannyTexture() {
   const textureLoader = new THREE.TextureLoader();
-  // Load Granny Texture with fallback
-  textureLoader.load(
-    'textures/GrannyG1New.webp',
-    (texture) => {
-      grannyTexture = texture;
-      texture.transparent = true;
-    },
-    undefined,
-    () => {
-      // Error fallback
-      grannyTexture = new THREE.Texture();
-      const canvas = document.createElement('canvas');
-      canvas.width = 128;
-      canvas.height = 256;
-      const ctx = canvas.getContext('2d');
-      ctx.fillStyle = 'black';
-      ctx.fillRect(0, 0, 128, 256);
-      grannyTexture.image = canvas;
-      grannyTexture.needsUpdate = true;
-    }
-  );
+  
+  // ✅ LOAD GRANNY PNG TEXTURE
+  textureLoader.load('textures/GrannyG1New.webp', (texture) => {
+    grannyTexture = texture;
+    texture.transparent = true;
+  });
 }
 
-// ========== DAY LIGHTING SETUP ==========
 function setupDayLighting() {
+  // ✅ BRIGHT AMBIENT LIGHT
   scene.add(new THREE.AmbientLight(0xffffff, 0.8));
+
+  // ✅ SUN DIRECTIONAL LIGHT
   const sun = new THREE.DirectionalLight(0xffffff, 1.2);
   sun.position.set(200, 300, 150);
   sun.castShadow = true;
-  sun.shadow.mapSize.set(8192, 8192);
+  sun.shadow.mapSize.set(4096, 4096);
   sun.shadow.camera.near = 0.5;
   sun.shadow.camera.far = 800;
+  sun.shadow.camera.left = -500;
+  sun.shadow.camera.right = 500;
+  sun.shadow.camera.top = 500;
+  sun.shadow.camera.bottom = -500;
   scene.add(sun);
 
+  // ✅ VISUAL SUN IN SKY
   const sunGeometry = new THREE.SphereGeometry(40, 32, 32);
   const sunMaterial = new THREE.MeshBasicMaterial({ color: 0xFFD700 });
   const sunMesh = new THREE.Mesh(sunGeometry, sunMaterial);
   sunMesh.position.set(200, 400, -500);
   scene.add(sunMesh);
 
+  // ✅ SUN GLOW
   const glowGeometry = new THREE.SphereGeometry(50, 32, 32);
   const glowMaterial = new THREE.MeshBasicMaterial({
     color: 0xFFA500,
@@ -238,11 +231,13 @@ function setupDayLighting() {
   sunGlow.position.copy(sunMesh.position);
   scene.add(sunGlow);
 
+  // ✅ ADD CLOUDS
   createClouds();
 }
 
 function createClouds() {
   const cloudTexture = createCloudTexture();
+
   for (let i = 0; i < 8; i++) {
     const cloudGeometry = new THREE.PlaneGeometry(150, 80);
     const cloudMaterial = new THREE.MeshStandardMaterial({
@@ -251,6 +246,7 @@ function createClouds() {
       emissiveIntensity: 0.6,
       transparent: true
     });
+
     const cloud = new THREE.Mesh(cloudGeometry, cloudMaterial);
     cloud.position.set(
       (Math.random() - 0.5) * 1000,
@@ -268,19 +264,21 @@ function createCloudTexture() {
   canvas.width = 256;
   canvas.height = 128;
   const ctx = canvas.getContext("2d");
+
   ctx.fillStyle = "rgba(255, 255, 255, 0.8)";
   ctx.filter = "blur(5px)";
+
   for (let i = 0; i < 30; i++) {
     const x = Math.random() * canvas.width;
     const y = Math.random() * canvas.height;
     const size = Math.random() * 40 + 20;
     ctx.fillRect(x, y, size, size);
   }
+
   const texture = new THREE.CanvasTexture(canvas);
   return texture;
 }
 
-// ========== SETUP PLAYER ==========
 function setupPlayer() {
   player = new THREE.Object3D();
   player.position.set(
@@ -290,13 +288,14 @@ function setupPlayer() {
   );
   lastSafePosition.copy(player.position);
   scene.add(player);
+
   player.add(camera);
   camera.position.set(0, WORLD.EYE_HEIGHT, 0);
   camera.rotation.order = "YXZ";
 }
 
-// ========== SETUP TORCH ==========
 function setupTorch() {
+  // ✅ DAY MODE - TORCH IS WEAKER BUT STILL USEFUL
   torchLight = new THREE.SpotLight(0xffffff, 0, 200, Math.PI / 4.5, 0.5, 2);
   torchLight.shadow.mapSize.set(2048, 2048);
   torchLight.shadow.camera.near = 0.1;
@@ -305,10 +304,9 @@ function setupTorch() {
   camera.add(torchLight.target);
   torchLight.target.position.set(0, 0, -1);
   GameState.torchOn = true;
-  torchLight.intensity = 3;
+  torchLight.intensity = 3; // ✅ Reduced for day
 }
 
-// ========== EVENT LISTENERS ==========
 function setupEventListeners() {
   window.addEventListener("keydown", keyDown);
   window.addEventListener("keyup", keyUp);
@@ -323,33 +321,35 @@ function setupEventListeners() {
 // ============================================
 
 let audioContext;
+
 function initAudioContext() {
   if (!audioContext) {
     audioContext = new (window.AudioContext || window.webkitAudioContext)();
   }
 }
+
 function createSound(frequency, duration, type = "sine") {
   if (!audioContext) return;
+
   const osc = audioContext.createOscillator();
   const gain = audioContext.createGain();
+
   osc.connect(gain);
   gain.connect(audioContext.destination);
+
   osc.frequency.value = frequency;
   osc.type = type;
+
   gain.gain.setValueAtTime(0.1, audioContext.currentTime);
   gain.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + duration);
+
   osc.start(audioContext.currentTime);
   osc.stop(audioContext.currentTime + duration);
 }
+
 function playSound(soundName) {
   if (!audioContext) return;
-  const now = Date.now();
-  // Cooldown management to prevent overlaps
-  if (playSound.cooldowns && playSound.cooldowns[soundName]) {
-    if (now - playSound.cooldowns[soundName] < 300) return;
-  }
-  if (!playSound.cooldowns) playSound.cooldowns = {};
-  playSound.cooldowns[soundName] = now;
+
   switch (soundName) {
     case "heartbeat":
       createSound(60, 0.3, "sine");
@@ -437,9 +437,6 @@ function createTerrain() {
   geometry.rotateX(-Math.PI / 2);
 
   const pos = geometry.attributes.position;
-  // Use reusable vectors to optimize
-  const tempVec = new THREE.Vector3();
-
   for (let i = 0; i < pos.count; i++) {
     const x = pos.getX(i);
     const z = pos.getZ(i);
@@ -723,18 +720,9 @@ function detectPlayer() {
   }
 
   // ✅ SOUND DETECTION
-  if (
-    GameState.lastPlayerSound.type === "footstep" && 
-    distance < GRANNY.DETECTION_RANGE * 1.2
-  ) return true;
-  if (
-    GameState.lastPlayerSound.type === "run" && 
-    distance < GRANNY.DETECTION_RANGE * 1.5
-  ) return true;
-  if (
-    GameState.lastPlayerSound.type === "jump" && 
-    distance < GRANNY.DETECTION_RANGE * 1.3
-  ) return true;
+  if (GameState.lastPlayerSound.type === "footstep" && distance < GRANNY.DETECTION_RANGE * 1.2) return true;
+  if (GameState.lastPlayerSound.type === "run" && distance < GRANNY.DETECTION_RANGE * 1.5) return true;
+  if (GameState.lastPlayerSound.type === "jump" && distance < GRANNY.DETECTION_RANGE * 1.3) return true;
 
   return false;
 }
@@ -768,10 +756,7 @@ function updateGrannyAI(delta) {
   }
 
   // ✅ CHASE TO INVESTIGATE
-  if (
-    GameState.enemyState === "chase" && 
-    distance > GRANNY.CHASE_RANGE
-  ) {
+  if (GameState.enemyState === "chase" && distance > GRANNY.CHASE_RANGE) {
     GameState.enemyState = "investigate";
     granny.userData.lastKnownPlayerPos.copy(player.position);
     GameState.enemyInvestigating = true;
@@ -779,10 +764,7 @@ function updateGrannyAI(delta) {
   }
 
   // ✅ INVESTIGATE TO PATROL
-  if (
-    GameState.enemyState === "investigate" && 
-    GameState.investigateTimer <= 0
-  ) {
+  if (GameState.enemyState === "investigate" && GameState.investigateTimer <= 0) {
     GameState.enemyState = "patrol";
     GameState.enemyInvestigating = false;
     pickGrannyPatrolTarget();
@@ -798,13 +780,13 @@ function updateGrannyAI(delta) {
   if (GameState.enemyState === "investigate") investigateGranny(delta);
   if (GameState.enemyState === "chase") chasePlayer(delta);
 
-  // Update Granny's Y position based on terrain
   granny.position.y = getTerrainHeight(granny.position.x, granny.position.z) + 0.5;
+  updateDangerLevel(distance);
 
-  // Always face the player (billboard)
+  // ✅ GRANNY BILLBOARD - ALWAYS FACE PLAYER
   granny.lookAt(player.position.x, granny.position.y, player.position.z);
 
-  // Random sounds occasionally
+  // ✅ RANDOM SOUNDS
   if (Math.random() < 0.001 && GameState.enemyState === "patrol") {
     playRandomHorrorSound();
   }
@@ -827,8 +809,7 @@ function investigateGranny(delta) {
   dir.y = 0;
   dir.normalize();
 
-  // Smooth movement towards investigate point
-  granny.position.lerp(granny.position.clone().add(dir), delta * 0.8);
+  granny.position.addScaledVector(dir, GRANNY.PATROL_SPEED * 1.5 * delta);
   granny.lookAt(investigatePos.x, granny.position.y, investigatePos.z);
   avoidGrannyHardClip();
 }
@@ -847,9 +828,12 @@ function patrolGranny(delta) {
   }
 
   dir.normalize();
-  // Smooth patrol movement
-  granny.position.lerp(granny.position.clone().add(dir), delta * 0.5);
-  granny.lookAt(granny.position.x + dir.x, granny.position.y, granny.position.z + dir.z);
+  granny.position.addScaledVector(dir, GRANNY.PATROL_SPEED * delta);
+  granny.lookAt(
+    granny.position.x + dir.x,
+    granny.position.y,
+    granny.position.z + dir.z
+  );
   avoidGrannyHardClip();
 }
 
@@ -858,17 +842,18 @@ function chasePlayer(delta) {
   dir.y = 0;
   dir.normalize();
 
-  // Smooth chase movement
-  granny.position.lerp(granny.position.clone().add(dir), delta * 0.8);
+  granny.position.addScaledVector(dir, GRANNY.CHASE_SPEED * delta);
   granny.lookAt(player.position.x, granny.position.y, player.position.z);
   avoidGrannyHardClip();
 }
 
 function attackPlayer() {
   const distance = granny.position.distanceTo(player.position);
+  
   if (distance < GRANNY.ATTACK_RANGE + 2) {
     playSound("granny_attack");
     damagePlayer(GRANNY.ATTACK_DAMAGE);
+    
     console.log(`🔴 GRANNY ATTACKED! Health: ${GameState.health}`);
   }
 }
@@ -906,7 +891,9 @@ function updateDangerLevel(distance) {
 
 function applyDangerUI(level) {
   const gameUI = document.getElementById("gameUI");
+
   gameUI.classList.remove("enemy-near", "danger-shake");
+
   if (level === "high" || level === "critical") {
     gameUI.classList.add("enemy-near");
   }
@@ -946,16 +933,6 @@ function updateHorrorEvents(delta) {
       }
     } else if (eventType === 3) {
       playRandomHorrorSound();
-    }
-
-    // Add more random horror events: flickering lights, shadows, etc.
-    if (Math.random() < 0.002 && torchLight) {
-      torchLight.intensity = Math.random() > 0.5 ? 0 : 3;
-      setTimeout(() => {
-        if (GameState.torchOn) {
-          torchLight.intensity = 3;
-        }
-      }, 200 + Math.random() * 300);
     }
 
     GameState.horrorEventTimer = 15 + Math.random() * 20;
@@ -1013,15 +990,6 @@ function updatePlayer(delta) {
     } else if (direction.lengthSq() > 0) {
       GameState.lastPlayerSound = { time: Date.now(), type: "footstep" };
     }
-  }
-
-  // Keep player above terrain
-  const terrainY = getTerrainHeight(player.position.x, player.position.z);
-  const floorY = terrainY + WORLD.PLAYER_HEIGHT;
-  if (player.position.y < floorY) {
-    player.position.y = floorY;
-    GameState.velocityY = 0;
-    GameState.isJumping = false;
   }
 
   const limitX = WORLD.WIDTH / 2 - 10;
@@ -1152,9 +1120,11 @@ function updateObjective(stage) {
 function updateGravity(delta) {
   player.position.y += GameState.velocityY * delta;
   GameState.velocityY -= 20 * delta;
-  const terrainY = getTerrainHeight(player.position.x, player.position.z);
-  const floorY = terrainY + WORLD.PLAYER_HEIGHT;
-  if (player.position.y < floorY) {
+
+  const groundY = getTerrainHeight(player.position.x, player.position.z);
+  const floorY = groundY + WORLD.PLAYER_HEIGHT;
+
+  if (player.position.y <= floorY) {
     player.position.y = floorY;
     GameState.velocityY = 0;
     GameState.isJumping = false;
@@ -1171,12 +1141,9 @@ function handleCollisions() {
     const minDist = radius + col.r;
 
     if (distSq < minDist * minDist) {
-      // Gently push player outside collider
-      const dist = Math.sqrt(distSq) || 0.01;
-      const pushX = (dx / dist) * (minDist - dist) * 0.2;
-      const pushZ = (dz / dist) * (minDist - dist) * 0.2;
-      player.position.x += pushX;
-      player.position.z += pushZ;
+      player.position.x = lastSafePosition.x;
+      player.position.z = lastSafePosition.z;
+      return;
     }
   }
 }
@@ -1190,10 +1157,8 @@ function avoidGrannyHardClip() {
 
     if (distSq < minDist * minDist) {
       const dist = Math.sqrt(distSq) || 0.01;
-      const pushX = (dx / dist) * (minDist - dist) * 0.2;
-      const pushZ = (dz / dist) * (minDist - dist) * 0.2;
-      granny.position.x += pushX;
-      granny.position.z += pushZ;
+      granny.position.x = col.x + (dx / dist) * minDist;
+      granny.position.z = col.z + (dz / dist) * minDist;
     }
   }
 }
@@ -1221,6 +1186,7 @@ function addBoxCollider(mesh) {
 
 function keyDown(e) {
   const key = e.key.toLowerCase();
+
   if (key === "w") GameState.move.w = true;
   if (key === "a") GameState.move.a = true;
   if (key === "s") GameState.move.s = true;
@@ -1234,6 +1200,7 @@ function keyDown(e) {
 
 function keyUp(e) {
   const key = e.key.toLowerCase();
+
   if (key === "w") GameState.move.w = false;
   if (key === "a") GameState.move.a = false;
   if (key === "s") GameState.move.s = false;
@@ -1242,20 +1209,15 @@ function keyUp(e) {
 }
 
 function handleMouseLook(e) {
-  if (
-    document.pointerLockElement !== document.body ||
-    GameState.paused
-  ) return;
+  if (document.pointerLockElement !== document.body || GameState.paused) return;
+
   GameState.yaw -= e.movementX * WORLD.MOUSE_SENSITIVITY;
   GameState.pitch -= e.movementY * WORLD.MOUSE_SENSITIVITY;
   GameState.pitch = Math.max(-1.5, Math.min(1.5, GameState.pitch));
 }
 
 function handlePointerLockChange() {
-  if (
-    document.pointerLockElement !== document.body &&
-    GameState.started
-  ) {
+  if (document.pointerLockElement !== document.body && GameState.started) {
     GameState.move.w = false;
     GameState.move.a = false;
     GameState.move.s = false;
@@ -1265,24 +1227,18 @@ function handlePointerLockChange() {
 }
 
 function requestPointerControl() {
-  if (
-    !GameState.paused &&
-    GameState.started &&
-    document.body.requestPointerLock
-  ) {
+  if (!GameState.paused && GameState.started && document.body.requestPointerLock) {
     document.body.requestPointerLock();
   }
 }
 
 function togglePause() {
   GameState.paused = !GameState.paused;
+
   const pauseBtn = document.getElementById("pauseBtn");
   if (pauseBtn) pauseBtn.innerHTML = GameState.paused ? "Play" : "Pause";
 
-  if (
-    GameState.paused &&
-    document.exitPointerLock
-  ) {
+  if (GameState.paused && document.exitPointerLock) {
     document.exitPointerLock();
   } else {
     requestPointerControl();
@@ -1291,11 +1247,10 @@ function togglePause() {
 
 function toggleTorch() {
   GameState.torchOn = !GameState.torchOn;
-  if (torchLight)
-    torchLight.intensity = GameState.torchOn ? 3 : 0;
+  if (torchLight) torchLight.intensity = GameState.torchOn ? 3 : 0;
+
   const torchBtn = document.getElementById("torchBtn");
-  if (torchBtn)
-    torchBtn.innerHTML = GameState.torchOn ? "Torch ON" : "Torch OFF";
+  if (torchBtn) torchBtn.innerHTML = GameState.torchOn ? "Torch ON" : "Torch OFF";
 }
 
 function jump() {
@@ -1313,6 +1268,7 @@ function jump() {
 
 function setupMobileUiButtons() {
   const runBtn = document.getElementById("runBtn");
+
   if (runBtn) {
     runBtn.addEventListener("touchstart", (e) => {
       e.preventDefault();
@@ -1343,24 +1299,29 @@ function createMobileControls() {
     touch-action: none;
   `;
   document.body.appendChild(joy);
+
   let startX = 0;
   let startY = 0;
+
   joy.addEventListener("touchstart", (e) => {
     e.preventDefault();
     GameState.joystick.active = true;
     startX = e.touches[0].clientX;
     startY = e.touches[0].clientY;
   });
+
   joy.addEventListener("touchmove", (e) => {
     e.preventDefault();
     GameState.joystick.dx = e.touches[0].clientX - startX;
     GameState.joystick.dy = e.touches[0].clientY - startY;
   });
+
   joy.addEventListener("touchend", () => {
     GameState.joystick.active = false;
     GameState.joystick.dx = 0;
     GameState.joystick.dy = 0;
   });
+
   const jumpBtn = document.createElement("button");
   jumpBtn.innerHTML = "JUMP";
   jumpBtn.style.cssText = `
@@ -1375,6 +1336,7 @@ function createMobileControls() {
     touch-action: none;
   `;
   document.body.appendChild(jumpBtn);
+
   jumpBtn.addEventListener("touchstart", (e) => {
     e.preventDefault();
     jump();
@@ -1388,13 +1350,17 @@ function createMobileControls() {
 function updateHealthUI() {
   const healthValue = document.getElementById("healthValue");
   const healthFill = document.getElementById("healthFill");
+
   if (healthValue) healthValue.innerText = Math.ceil(GameState.health);
   if (healthFill) healthFill.style.width = GameState.health + "%";
+
   if (GameState.health < 30) {
     document.getElementById("gameUI").classList.add("low-health");
   } else {
     document.getElementById("gameUI").classList.remove("low-health");
   }
+
+  // ✅ AUTO GAME OVER IF HEALTH REACHES 0
   if (GameState.health <= 0) {
     showGameOver();
   }
@@ -1407,8 +1373,9 @@ function updateStaminaUI() {
 
 function updateBatteryUI() {
   const torchIndicator = document.getElementById("torchIndicator");
-  if (torchIndicator)
+  if (torchIndicator) {
     torchIndicator.innerText = GameState.torchOn ? "Torch: ON" : "Torch: OFF";
+  }
 }
 
 function updateObjectiveUI() {
@@ -1419,10 +1386,14 @@ function updateObjectiveUI() {
 function updateInventoryUI() {
   const invKey = document.getElementById("inventoryKey");
   const invNotes = document.getElementById("inventoryNotes");
-  if (invKey)
+
+  if (invKey) {
     invKey.style.display = GameState.inventory.key ? "block" : "none";
-  if (invNotes)
+  }
+
+  if (invNotes) {
     invNotes.innerText = "Notes: " + GameState.inventory.notesCollected;
+  }
 }
 
 // ============================================
@@ -1430,23 +1401,28 @@ function updateInventoryUI() {
 // ============================================
 
 function showGameOver() {
-  if (GameState.paused) return;
+  if (GameState.paused) return; // Prevent multiple calls
+  
   GameState.paused = true;
   GameState.jumpscareStarted = true;
   document.getElementById("gameUI").style.display = "none";
   document.getElementById("gameOver").style.display = "flex";
   if (document.exitPointerLock) document.exitPointerLock();
+  
   playSound("jumpscare");
   console.log("💀 GAME OVER! Granny caught you!");
 }
 
 function showVictory() {
-  if (GameState.paused) return;
+  if (GameState.paused) return; // Prevent multiple calls
+  
   GameState.paused = true;
   document.getElementById("gameUI").style.display = "none";
   document.getElementById("victory").style.display = "flex";
   if (document.exitPointerLock) document.exitPointerLock();
+
   playSound("door_open");
+
   setTimeout(() => {
     playSound("jumpscare");
     alert("You escaped... but it follows you still...");
@@ -1457,12 +1433,14 @@ function damagePlayer(amount) {
   GameState.health = Math.max(0, GameState.health - amount);
   playSound("damage");
   updateHealthUI();
-  // Flash effect on damage
+  
+  // ✅ FLASH EFFECT ON DAMAGE
   const gameUI = document.getElementById("gameUI");
   gameUI.style.filter = "brightness(0.7)";
   setTimeout(() => {
     gameUI.style.filter = "brightness(1)";
   }, 200);
+
   if (GameState.health <= 0) {
     showGameOver();
   }
@@ -1471,6 +1449,7 @@ function damagePlayer(amount) {
 function restartGame() {
   location.reload();
 }
+
 function backToMenu() {
   location.reload();
 }
@@ -1487,8 +1466,11 @@ function onResize() {
 
 function animate() {
   requestAnimationFrame(animate);
+
   if (!player || !renderer || !scene || !camera) return;
+
   const delta = Math.min(clock.getDelta(), 0.05);
+
   if (!GameState.paused) {
     updatePlayer(delta);
     updateGravity(delta);
@@ -1504,5 +1486,6 @@ function animate() {
       shadowFigure.visible = false;
     }
   }
+
   renderer.render(scene, camera);
 }
