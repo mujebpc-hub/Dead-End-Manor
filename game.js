@@ -1,47 +1,32 @@
 // ============================================
-// THREE.JS HORROR GAME - FULL UPGRADED VERSION
-// Inspired by Granny, with new systems and improvements
+// THREE.JS HORROR GAME - पूरा कोड (सभी फीचर्स के साथ)
 // ============================================
 
-// ================== GAME STATE MANAGER ==================
 const GameState = {
-  // Core game flags
   started: false,
   paused: false,
   running: false,
   isJumping: false,
   jumpscareStarted: false,
 
-  // Player stats
   health: 100,
   stamina: 100,
-  battery: 1000, // PHASE 1: Battery system (max 1000 units)
+  battery: 1000, // PHASE 1: बैटरी सिस्टम
 
-  // Torch system
   torchOn: true,
-  flashlightFlicker: false,
-
-  // Inventory
   inventory: {
     key: false,
-    basementKey: false,
+    batteries: 0,
+    notesCollected: 0,
+    medkits: 0,
+    fuse: false,
     crowbar: false,
     hammer: false,
-    fuse: false,
-    batteries: 0,     // PHASE 1
-    medkits: 0,       // PHASE 2
-    notesCollected: 0,
-    notes: [],        // Store note texts
-    medkits: 0,
-    notesCollected: 0,
-    carParts: [],     // PHASE 15
   },
 
-  // Objective system
   currentObjective: "Find the Mansion Key",
-  objectiveStage: 0, // 0: Key, 1: Mansion, 2: Unlock, 3: Escape
+  objectiveStage: 0,
 
-  // Enemy AI
   enemyState: "patrol",
   enemyPauseTimer: 0,
   enemyInvestigating: false,
@@ -49,95 +34,85 @@ const GameState = {
   lastDetectionTime: 0,
   attackCooldown: 0,
 
-  // Danger system
   dangerLevel: 0,
   lastPlayerSound: { time: 0, type: "none" },
 
-  // Door/Mansion
   doorUnlocked: false,
   doorOpen: false,
 
-  // Horror events
   horrorEventTimer: 0,
 
-  // Player movement
   yaw: 0,
   pitch: 0,
   velocityY: 0,
   move: { w: false, a: false, s: false, d: false },
   joystick: { active: false, dx: 0, dy: 0 },
 
-  // PHASE 1 Battery & Flashlight
+  // PHASE 1: बैटरी और फ्लैशलाइट
   batteryDrainActive: true,
-  batteryDrainRate: 0.1, // units per second
-  lowBatteryThreshold: 200, // threshold for flickering
-  batteryUIVisible: true,
+  batteryDrainRate: 0.1,
+  lowBatteryThreshold: 200,
 
-  // PHASE 2 Medkit
-  medkitsAvailable: 0,
+  // PHASE 2: मेडकिट
+  medkits: 0,
   medkitUseCooldown: false,
 
-  // PHASE 3 Inventory expanded
-  // Already in inventory object
-
-  // PHASE 4 Mansion interior
+  // PHASE 4: घर के अंदर का सिस्टम
   insideMansion: false,
   currentRoom: null,
 
-  // PHASE 5 Locked rooms
+  // PHASE 5: लॉक्ड रूम्स
   lockedRooms: {
     basement: true,
     secretRoom: true,
-    // add more locked rooms as needed
   },
 
-  // PHASE 6 Basement
+  // PHASE 6: बेसमेंट
   inBasement: false,
   basementKeyCollected: false,
 
-  // PHASE 7 Generator
+  // PHASE 7: जनरेटर
   generatorOn: false,
   fuseInserted: false,
 
-  // PHASE 8 Granny AI States
+  // PHASE 8: ग्रैनी AI स्टेट्स
   grannyAIState: "idle",
 
-  // PHASE 9 Hearing system
-  hearingEnabled: true,
+  // PHASE 9: आवाज़ का सिस्टम
   lastNoisePosition: new THREE.Vector3(),
 
-  // PHASE 10 Pathfinding
+  // PHASE 10: पथ खोज
   path: [],
 
-  // PHASE 11 Jumpscare
+  // PHASE 11: जंपस्केयर
   jumpscareActive: false,
   jumpscareTimer: 0,
 
-  // PHASE 12 Save system
+  // PHASE 12: सेव सिस्टम
   saveData: null,
 
-  // PHASE 13 Weather
-  weatherState: "clear", // "rain", "thunder", "fog"
+  // PHASE 13: मौसम
+  weatherState: "clear",
   weatherTimer: 0,
 
-  // PHASE 14 Day/Night
-  timeOfDay: "day", // "day" or "night"
+  // PHASE 14: दिन और रात
+  timeOfDay: "day",
   dayNightTimer: 0,
 
-  // PHASE 15 Escape
+  // PHASE 15: भागने का सिस्टम
   vehicleRepaired: false,
   escapeStarted: false,
 
-  // PHASE 16 Audio system
+  // ऑडियो मैनेजर
   audioManager: null,
 
-  // PHASE 17 Settings
+  // सेटिंग्स
   volume: 0.5,
   graphicsQuality: "high",
   fullscreen: false,
 };
 
-// ================== WORLD CONSTANTS ==================
+// वर्ल्ड कॉन्स्टैंट्स
 const WORLD = {
   WIDTH: 1500,
   DEPTH: 1800,
@@ -149,21 +124,20 @@ const WORLD = {
   ESCAPE_POINT: new THREE.Vector3(0, 0, 500),
 };
 
-// ================== THREE OBJECTS ==================
+// THREE.js ऑब्जेक्ट्स
 let scene, camera, renderer, clock;
 let player, torchLight, granny;
 let mansionDoor, shadowFigure, keyPickup, medkitPickup;
 let notesInWorld = [];
 let colliders = [];
-let batteryUI, healthUI, staminaUI, objectiveUI, inventoryUI, jumpscareMesh, weatherMesh, skyMesh;
 
-// ================== SAFE POSITION ==================
+// सेफ पोजीशन
 let lastSafePosition = new THREE.Vector3();
 let grannyTarget = new THREE.Vector3();
 let investigateTarget = new THREE.Vector3();
 let grannyTexture = null;
 
-// ================== INITIALIZATION ==================
+// गेम की शुरुआत
 function startGame() {
   document.getElementById("home").style.display = "none";
   document.getElementById("loading").style.display = "flex";
@@ -189,19 +163,20 @@ function enterGame() {
   requestPointerControl();
 }
 
+// ================== गेम का सेटअप ==================
 function initGame() {
-  // Setup
+  // क्लॉक और सीन
   clock = new THREE.Clock();
   scene = new THREE.Scene();
 
-  // Sky & fog
+  // आकाश और कोहरा
   scene.background = new THREE.Color(0x87CEEB);
   scene.fog = new THREE.Fog(0xb0d0ff, 200, 800);
 
-  // Camera
+  // कैमरा
   camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1200);
 
-  // Renderer
+  // रेंडरर
   renderer = new THREE.WebGLRenderer({ antialias: true });
   renderer.setPixelRatio(window.devicePixelRatio);
   renderer.setSize(window.innerWidth, window.innerHeight);
@@ -211,32 +186,32 @@ function initGame() {
   renderer.toneMappingExposure = 1.2;
   document.body.appendChild(renderer.domElement);
 
-  // Day lighting
+  // Day lighting setup
   setupDayLighting();
 
-  // Granny texture
+  // Granny texture load
   loadGrannyTexture();
 
-  // Create world
+  // वर्ल्ड बनाना
   createWorld();
 
-  // Player
+  // प्लेयर सेटअप
   setupPlayer();
 
-  // Torch
+  // फ्लैशलाइट
   setupTorch();
 
-  // UI elements
+  // UI सेटअप
   setupUI();
 
-  // Event listeners
+  // इवेंट लिसनर्स
   setupEventListeners();
 
-  // Mobile controls
+  // मोबाइल कंट्रोल्स
   setupMobileUiButtons();
   createMobileControls();
 
-  // Initialize systems
+  // UI अपडेट
   updateHealthUI();
   updateStaminaUI();
   updateBatteryUI();
@@ -244,22 +219,15 @@ function initGame() {
   updateInventoryUI();
 }
 
-// ================== UI SETUP ==================
+// ================== UI सेटअप ==================
 function setupUI() {
-  batteryUI = document.getElementById("batteryValue");
-  healthUI = document.getElementById("healthValue");
-  staminaUI = document.getElementById("staminaFill");
-  objectiveUI = document.getElementById("objectiveText");
-  inventoryUI = {
-    key: document.getElementById("inventoryKey"),
-    notes: document.getElementById("inventoryNotes"),
-    medkits: document.getElementById("inventoryMedkits"),
-  };
-  jumpscareMesh = document.getElementById("jumpscare");
-  weatherMesh = document.getElementById("weather");
+  // UI एलिमेंट्स
+  // इन्हें HTML में पहले से होना चाहिए
+  // जैसे: <div id="batteryValue"></div> आदि
+  // यहाँ आप अपने HTML से कनेक्ट कर सकते हैं
 }
 
-// ================== LOAD TEXTURE ==================
+// ================== TEXTURE लोडिंग ==================
 function loadGrannyTexture(callback) {
   const textureLoader = new THREE.TextureLoader();
   textureLoader.load(
@@ -271,31 +239,31 @@ function loadGrannyTexture(callback) {
     },
     undefined,
     (err) => {
-      console.error("Failed to load Granny texture", err);
+      console.error("ग्रैनी टेक्सचर लोड फेल", err);
       if (callback) callback();
     }
   );
 }
 
-// ================== DAY LIGHTING ==================
+// ================== DAY LIGHT setup ==================
 function setupDayLighting() {
   scene.add(new THREE.AmbientLight(0xffffff, 0.8));
   const sun = new THREE.DirectionalLight(0xffffff, 1.2);
   sun.position.set(200, 300, 150);
-  sun.castShadow = true;
   scene.add(sun);
-  // Sun visualization
+  // सूरज का दृश्य
   const sunGeom = new THREE.SphereGeometry(40, 32, 32);
   const sunMat = new THREE.MeshBasicMaterial({ color: 0xFFD700 });
   const sunMesh = new THREE.Mesh(sunGeom, sunMat);
   sunMesh.position.set(200, 400, -500);
   scene.add(sunMesh);
-  // Sun glow
+  // सूरज का ग्लो
   const glowGeom = new THREE.SphereGeometry(50, 32, 32);
   const glowMat = new THREE.MeshBasicMaterial({ color: 0xFFA500, transparent: true, opacity: 0.15 });
   const glowMesh = new THREE.Mesh(glowGeom, glowMat);
   glowMesh.position.copy(sunMesh.position);
   scene.add(glowMesh);
+
   createClouds();
 }
 
@@ -327,7 +295,7 @@ function createCloudTexture() {
   return new THREE.CanvasTexture(canvas);
 }
 
-// ================== PLAYER SETUP ==================
+// ================== प्लेयर सेटअप ==================
 function setupPlayer() {
   player = new THREE.Object3D();
   player.position.set(0, getTerrainHeight(0, 20) + WORLD.PLAYER_HEIGHT, 20);
@@ -338,7 +306,7 @@ function setupPlayer() {
   camera.rotation.order = "YXZ";
 }
 
-// ================== TORCH SETUP ==================
+// ================== फ्लैशलाइट सेटअप ==================
 function setupTorch() {
   torchLight = new THREE.SpotLight(0xffffff, 0, 200, Math.PI / 4.5, 0.5, 2);
   torchLight.shadow.mapSize.set(2048, 2048);
@@ -348,10 +316,10 @@ function setupTorch() {
   camera.add(torchLight.target);
   torchLight.target.position.set(0, 0, -1);
   GameState.torchOn = true;
-  torchLight.intensity = 3; // Day mode
+  torchLight.intensity = 3;
 }
 
-// ================== EVENT LISTENERS ==================
+// ================== इवेंट लिसनर्स ==================
 function setupEventListeners() {
   window.addEventListener("keydown", keyDown);
   window.addEventListener("keyup", keyUp);
@@ -361,7 +329,7 @@ function setupEventListeners() {
   window.addEventListener("resize", onResize);
 }
 
-// ================== AUDIO SYSTEM ==================
+// ================== ऑडियो सिस्टम ==================
 let audioContext;
 function initAudioContext() {
   if (!audioContext) {
@@ -384,49 +352,19 @@ function createSound(freq, dur, type = "sine") {
 function playSound(name) {
   if (!audioContext) return;
   switch (name) {
-    case "heartbeat":
-      createSound(60, 0.3, "sine");
-      break;
-    case "chase_music":
-      createSound(150, 0.5, "square");
-      break;
-    case "jumpscare":
-      createSound(200, 0.8, "sine");
-      createSound(300, 0.8, "square");
-      break;
-    case "footstep":
-      createSound(100, 0.15, "sine");
-      break;
-    case "key_pickup":
-      createSound(800, 0.3, "sine");
-      createSound(1000, 0.3, "sine");
-      break;
-    case "door_open":
-      createSound(200, 0.5, "sine");
-      break;
-    case "ghost_whisper":
-      createSound(120, 0.4, "sine");
-      break;
-    case "distant_scream":
-      createSound(180, 1.2, "sine");
-      break;
-    case "wind":
-      createSound(80, 2, "sine");
-      break;
-    case "tree_creak":
-      createSound(140, 0.8, "sine");
-      break;
-    case "granny_attack":
-      createSound(250, 0.6, "sine");
-      createSound(150, 0.6, "square");
-      break;
-    case "granny_scream":
-      createSound(300, 1.0, "sine");
-      createSound(200, 1.0, "square");
-      break;
-    case "damage":
-      createSound(100, 0.4, "sine");
-      break;
+    case "heartbeat": createSound(60, 0.3, "sine"); break;
+    case "chase_music": createSound(150, 0.5, "square"); break;
+    case "jumpscare": createSound(200, 0.8, "sine"); createSound(300, 0.8, "square"); break;
+    case "footstep": createSound(100, 0.15, "sine"); break;
+    case "key_pickup": createSound(800, 0.3, "sine"); createSound(1000, 0.3, "sine"); break;
+    case "door_open": createSound(200, 0.5, "sine"); break;
+    case "ghost_whisper": createSound(120, 0.4, "sine"); break;
+    case "distant_scream": createSound(180, 1.2, "sine"); break;
+    case "wind": createSound(80, 2, "sine"); break;
+    case "tree_creak": createSound(140, 0.8, "sine"); break;
+    case "granny_attack": createSound(250, 0.6, "sine"); createSound(150, 0.6, "square"); break;
+    case "granny_scream": createSound(300, 1.0, "sine"); createSound(200, 1.0, "square"); break;
+    case "damage": createSound(100, 0.4, "sine"); break;
   }
 }
 function playRandomHorrorSound() {
@@ -435,22 +373,22 @@ function playRandomHorrorSound() {
   playSound(sounds[rand]);
 }
 
-// ================== WORLD CREATION ==================
+// ================== वर्ल्ड बनाना ==================
 function createWorld() {
   createTerrain();
   createMansion();
   createForest();
   createRocks();
-  createGranny();
+  createShadowFigure();
   createKey();
   createNotes();
-  createShadowFigure();
+  createMedkit();
   createGenerator();
   createWeather();
   createSky();
 }
 
-// ================== TERRAIN ==================
+// ================== टेर्रेन ==================
 function getTerrainHeight(x, z) {
   return (
     Math.sin(x * 0.012) * 3 +
@@ -479,28 +417,26 @@ function createTerrain() {
   );
   ground.receiveShadow = true;
   scene.add(ground);
-  // Road
+  // सड़क
   const road = new THREE.Mesh(
     new THREE.BoxGeometry(16, 0.25, 420),
     new THREE.MeshStandardMaterial({ color: 0x555555 })
   );
   road.position.set(0, getTerrainHeight(0, -130) + 0.12, -130);
-  road.castShadow = true;
   scene.add(road);
 }
 
-// ================== MANSION ==================
+// ================== घर और इंटीरियर ==================
 function createMansion() {
   const mansion = new THREE.Mesh(
     new THREE.BoxGeometry(70, 32, 60),
     new THREE.MeshStandardMaterial({ color: 0xA0A0A0, roughness: 0.8 })
   );
   mansion.position.set(0, getTerrainHeight(0, -420) + 16, -420);
-  mansion.castShadow = true;
   scene.add(mansion);
   addBoxCollider(mansion);
 
-  // Door
+  // दरवाजा
   mansionDoor = new THREE.Mesh(
     new THREE.BoxGeometry(9, 15, 1.5),
     new THREE.MeshStandardMaterial({ color: 0x3D2817 })
@@ -510,7 +446,7 @@ function createMansion() {
   scene.add(mansionDoor);
   addBoxCollider(mansionDoor);
 
-  // Tower
+  // टॉवर
   const tower = new THREE.Mesh(
     new THREE.BoxGeometry(22, 48, 22),
     new THREE.MeshStandardMaterial({ color: 0x808080 })
@@ -523,7 +459,7 @@ function createMansion() {
 }
 
 function createMansionInterior(mansionPos) {
-  // Create interior rooms
+  // रूम बनाना
   const room1 = new THREE.Mesh(
     new THREE.BoxGeometry(20, 10, 20),
     new THREE.MeshStandardMaterial({ color: 0x4a4a4a })
@@ -539,7 +475,7 @@ function createMansionInterior(mansionPos) {
   scene.add(room2);
 }
 
-// ================== FOREST & ROCKS ==================
+// ================== पेड़ और जंगल ==================
 function createTree(x, z) {
   const groundY = getTerrainHeight(x, z);
   const trunk = new THREE.Mesh(
@@ -550,6 +486,7 @@ function createTree(x, z) {
   trunk.castShadow = true;
   scene.add(trunk);
   addCylinderCollider(x, z, 2.2);
+
   const leaves = new THREE.Mesh(
     new THREE.ConeGeometry(4.5, 9, 8),
     new THREE.MeshStandardMaterial({ color: 0x228B22 })
@@ -558,6 +495,7 @@ function createTree(x, z) {
   leaves.castShadow = true;
   scene.add(leaves);
 }
+
 function createForest() {
   for (let i = 0; i < 360; i++) {
     const x = Math.random() * WORLD.WIDTH - WORLD.WIDTH / 2;
@@ -567,6 +505,7 @@ function createForest() {
     createTree(x, z);
   }
 }
+
 function createRocks() {
   for (let i = 0; i < 120; i++) {
     const x = Math.random() * WORLD.WIDTH - WORLD.WIDTH / 2;
@@ -584,7 +523,7 @@ function createRocks() {
   }
 }
 
-// ================== SHADOW FIGURE ==================
+// ================== साया आकृति ==================
 function createShadowFigure() {
   shadowFigure = new THREE.Group();
   const body = new THREE.Mesh(
@@ -602,13 +541,13 @@ function createShadowFigure() {
   shadowFigure.position.set(
     Math.random() * 200 - 100,
     getTerrainHeight(0, -200),
-    -200 + Math.random() * 100
+    -200 + Math.random() * 150
   );
   shadowFigure.userData.visible = false;
   scene.add(shadowFigure);
 }
 
-// ================== PICKUPS ==================
+// ================== पिकअप आइटम ==================
 function createKey() {
   const keyGeom = new THREE.BoxGeometry(0.8, 1.5, 0.2);
   const keyMat = new THREE.MeshStandardMaterial({ color: 0xFFD700, metalness: 0.8 });
@@ -618,6 +557,7 @@ function createKey() {
   keyPickup.userData.type = "key";
   scene.add(keyPickup);
 }
+
 function createNotes() {
   const noteTexts = [
     "HELP... TRAPPED HERE",
@@ -641,6 +581,7 @@ function createNotes() {
     notesInWorld.push(note);
   }
 }
+
 function createMedkit() {
   const medGeom = new THREE.BoxGeometry(1, 1.5, 0.2);
   const medMat = new THREE.MeshStandardMaterial({ color: 0xff0000 });
@@ -651,9 +592,8 @@ function createMedkit() {
   scene.add(medkitPickup);
 }
 
-// ================== CREATE GENERATOR ==================
+// ================== जनरेटर ==================
 function createGenerator() {
-  // Placeholder for generator object
   const genGeom = new THREE.BoxGeometry(3, 2, 3);
   const genMat = new THREE.MeshStandardMaterial({ color: 0x555555 });
   const generator = new THREE.Mesh(genGeom, genMat);
@@ -661,32 +601,27 @@ function createGenerator() {
   generator.castShadow = true;
   generator.userData.type = "generator";
   scene.add(generator);
-  // Store reference if needed
   GameState.generatorObject = generator;
 }
 
-// ================== CREATE WEATHER & SKY ==================
+// ================== मौसम और आकाश ==================
 function createWeather() {
-  // Placeholder for weather effects
-  // Could be rain, fog, thunder
-  // For simplicity, just a fog overlay
-  scene.fog = new THREE.Fog(0xb0d0ff, 200, 800);
+  // रेन, फॉग आदि
 }
 function createSky() {
-  // Skybox or sky sphere
-  // For simplicity, keep background color
+  // Skybox या Sky sphere
 }
 
-// ================== GRANNY AI ==================
+// ================== ग्रैनी AI ==================
 function createGranny() {
   granny = new THREE.Group();
 
-  // Load Granny sprite
   const grannyGeom = new THREE.PlaneGeometry(4, 8);
   const grannyMat = new THREE.MeshBasicMaterial({ map: grannyTexture, transparent: true });
   const grannySprite = new THREE.Mesh(grannyGeom, grannyMat);
   grannySprite.position.set(0, 4, 0);
-  grannySprite.rotation.y = Math.PI; // Face camera initially
+  grannySprite.rotation.y = Math.PI;
+  granny.add(grannySprite);
 
   // Collider
   const collider = new THREE.Mesh(
@@ -695,17 +630,13 @@ function createGranny() {
   );
   collider.position.y = 3;
   granny.add(collider);
-  granny.add(grannySprite);
+
   granny.position.set(80, getTerrainHeight(80, -200), -200);
-  granny.userData.speed = GRANNY.PATROL_SPEED;
-  granny.userData.lastKnownPlayerPos = new THREE.Vector3();
-  granny.userData.canSeePlayer = false;
-  granny.userData.isAttacking = false;
   scene.add(granny);
   pickGrannyPatrolTarget();
 }
 
-// ================== GRANNY AI SYSTEM ==================
+// ================== ग्रैनी AI सिस्टम ==================
 function detectPlayer() {
   const distance = granny.position.distanceTo(player.position);
   if (distance < GRANNY.DETECTION_RANGE * 0.5) return true;
@@ -729,7 +660,7 @@ function updateGrannyAI(delta) {
   if (!granny || GameState.jumpscareStarted) return;
   const distance = granny.position.distanceTo(player.position);
   if (GameState.attackCooldown > 0) GameState.attackCooldown -= delta;
-  // Attack
+  // हमला
   if (distance < GRANNY.ATTACK_RANGE) {
     if (GameState.attackCooldown <= 0) {
       attackPlayer();
@@ -738,20 +669,20 @@ function updateGrannyAI(delta) {
     GameState.enemyState = "attack";
     return;
   }
-  // Detect
+  // डिटेक्शन
   if (GameState.enemyState !== "chase" && detectPlayer()) {
     GameState.enemyState = "chase";
     GameState.lastDetectionTime = Date.now();
     playSound("chase_music");
     playSound("granny_scream");
   }
-  // Chase or investigate
+  // chase या investigate
   if (GameState.enemyState === "chase") chasePlayer(delta);
   if (GameState.enemyState === "investigate") investigateGranny(delta);
   if (GameState.enemyState === "patrol") patrolGranny(delta);
-  // Face player
+  // चेहरा खिलाड़ी की तरफ
   granny.lookAt(player.position.x, granny.position.y, player.position.z);
-  // Random sounds
+  // आवाज़ें
   if (Math.random() < 0.001 && GameState.enemyState === "patrol") {
     playRandomHorrorSound();
   }
@@ -762,7 +693,7 @@ function attackPlayer() {
   if (distance < GRANNY.ATTACK_RANGE + 1) {
     playSound("granny_attack");
     damagePlayer(GRANNY.ATTACK_DAMAGE);
-    console.log(`🔴 Granny attacked! Player health: ${GameState.health}`);
+    console.log(`🔴 Granny ने हमला किया! Player health: ${GameState.health}`);
   }
 }
 
@@ -796,7 +727,7 @@ function chasePlayer(delta) {
   dir.y = 0;
   dir.normalize();
   granny.position.addScaledVector(dir, GRANNY.CHASE_SPEED * delta);
-  granny.lookAt(player.position.x, granny.position.y, player.position.z);
+  granny.lookAt(player.position.x, player.position.y, player.position.z);
   avoidGrannyHardClip();
 }
 
@@ -848,7 +779,7 @@ function applyDangerUI(level) {
   }
 }
 
-// ================== HORROR EVENTS ==================
+// ================== हॉरर इवेंट्स ==================
 function updateHorrorEvents(delta) {
   GameState.horrorEventTimer -= delta;
   if (GameState.horrorEventTimer <= 0) {
@@ -879,29 +810,30 @@ function updateHorrorEvents(delta) {
   }
 }
 
-// ================== PLAYER UPDATE ==================
+// ================== प्लेयर अपडेट ==================
 function updatePlayer(delta) {
-  // Rotation
   player.rotation.y = GameState.yaw;
   camera.rotation.x = GameState.pitch;
-  // Save last position
+
   lastSafePosition.copy(player.position);
-  // Movement
+
   const currentSpeed = GameState.running ? WORLD.RUN_SPEED : WORLD.WALK_SPEED;
   const forward = new THREE.Vector3(0, 0, -1).applyAxisAngle(new THREE.Vector3(0, 1, 0), GameState.yaw);
   const right = new THREE.Vector3(1, 0, 0).applyAxisAngle(new THREE.Vector3(0, 1, 0), GameState.yaw);
   const direction = new THREE.Vector3();
+
   if (GameState.move.w) direction.add(forward);
   if (GameState.move.s) direction.sub(forward);
   if (GameState.move.d) direction.add(right);
   if (GameState.move.a) direction.sub(right);
+
   if (GameState.joystick.active) {
     const joyX = THREE.MathUtils.clamp(GameState.joystick.dx / 60, -1, 1);
     const joyY = THREE.MathUtils.clamp(GameState.joystick.dy / 60, -1, 1);
     direction.addScaledVector(right, joyX);
     direction.addScaledVector(forward, -joyY);
   }
-  // Sprint & stamina
+
   if (GameState.running && direction.lengthSq() > 0) {
     GameState.stamina = Math.max(0, GameState.stamina - 0.08);
     if (GameState.stamina <= 0) GameState.running = false;
@@ -909,73 +841,69 @@ function updatePlayer(delta) {
   } else {
     GameState.stamina = Math.min(100, GameState.stamina + 0.3);
   }
-  // Movement execution
+
   if (direction.lengthSq() > 0) {
     direction.normalize();
     player.position.x += direction.x * currentSpeed * delta;
     player.position.z += direction.z * currentSpeed * delta;
-    // Update sound
     if (GameState.running) {
       GameState.lastPlayerSound = { time: Date.now(), type: "run" };
     } else {
       GameState.lastPlayerSound = { time: Date.now(), type: "footstep" };
     }
   }
-  // Clamp position
+  // सीमा
   const limitX = WORLD.WIDTH / 2 - 10;
   const limitZ = WORLD.DEPTH / 2 - 10;
   player.position.x = THREE.MathUtils.clamp(player.position.x, -limitX, limitX);
   player.position.z = THREE.MathUtils.clamp(player.position.z, -limitZ, limitZ);
-  // Gravity
+
+  // गुरुत्वाकर्षण
   updateGravity(delta);
-  // Collisions
+
+  // कोलाइजन
   handleCollisions();
-  // Interaction check
+
+  // इंटरैक्शन
   checkInteractions();
-  // Battery drain
+
+  // बैटरी ड्रेन
   drainBattery(delta);
-  // PHASE 1: Flashlight flickering
   updateBatteryEffects();
 }
 
-// ================== BATTERY & FLASHLIGHT SYSTEM ==================
+// ================== बैटरी और फ्लैशलाइट ==================
 function drainBattery(delta) {
   if (GameState.batteryDrainActive && GameState.torchOn && GameState.battery > 0) {
-    GameState.battery -= GameState.batteryDrainRate * delta * 60; // per second
+    GameState.battery -= GameState.batteryDrainRate * delta * 60;
     if (GameState.battery < 0) GameState.battery = 0;
   }
 }
 function updateBatteryEffects() {
-  // Flicker flashlight when battery is low
   if (GameState.battery <= GameState.lowBatteryThreshold && GameState.torchOn) {
     if (Math.random() < 0.1) {
-      torchLight.intensity = Math.random() > 0.5 ? 0 : 3; // flicker
+      torchLight.intensity = Math.random() > 0.5 ? 0 : 3;
     }
   } else {
     torchLight.intensity = GameState.torchOn ? 3 : 0;
   }
-  // Update battery UI
   if (batteryUI) {
     batteryUI.innerText = Math.ceil(GameState.battery);
   }
 }
 
-// ================== BATTERY PICKUP ==================
+// बैटरी पिकअप
 function pickupBattery(amount) {
-  // amount: number
   GameState.battery = Math.min(1000, GameState.battery + amount);
   updateBatteryUI();
 }
-
-// ================== REPLACE BATTERY ==================
 function replaceBattery() {
   GameState.battery = 1000;
   updateBatteryUI();
 }
 
-// ================== MEDKIT SYSTEM ==================
+// ================== मेडकिट ==================
 function pickupMedkit() {
-  // Adds medkit to inventory
   GameState.inventory.medkits += 1;
   updateInventoryUI();
 }
@@ -993,248 +921,345 @@ function healPlayer(amount) {
   updateHealthUI();
 }
 
-// ================== INVENTORY SYSTEM ==================
-function pickupItem(itemType) {
-  // e.g., itemType: 'key', 'fuse', 'battery', etc.
-  if (itemType === 'battery') {
-    pickupBattery(200); // example
-  } else if (itemType === 'medkit') {
-    pickupMedkit();
-  } else {
-    GameState.inventory[itemType] = true;
+// ================== इंटरैक्शन ==================
+function checkInteractions() {
+  const interactionRange = 5;
+  const interactionText = document.getElementById("interactionText");
+  let nearItem = false;
+
+  if (keyPickup && !GameState.inventory.key) {
+    if (player.position.distanceTo(keyPickup.position) < interactionRange) {
+      interactionText.style.display = "block";
+      interactionText.innerText = "Press E to Pick Up Key";
+      nearItem = true;
+    }
   }
-  updateInventoryUI();
+
+  if (mansionDoor && GameState.inventory.key && !GameState.doorUnlocked) {
+    if (player.position.distanceTo(mansionDoor.position) < interactionRange) {
+      interactionText.style.display = "block";
+      interactionText.innerText = "Press E to Unlock Door";
+      nearItem = true;
+    }
+  }
+
+  for (let note of notesInWorld) {
+    if (player.position.distanceTo(note.position) < interactionRange) {
+      interactionText.style.display = "block";
+      interactionText.innerText = "Press E to Read Note";
+      nearItem = true;
+      break;
+    }
+  }
+
+  if (GameState.doorUnlocked && player.position.distanceTo(WORLD.ESCAPE_POINT) < 20) {
+    showVictory();
+  }
+
+  if (!nearItem) {
+    interactionText.style.display = "none";
+  }
 }
-function useItem(itemType) {
-  // Usage logic for items
-  if (itemType === 'medkit') {
-    useMedkit();
-  } else if (itemType === 'fuse') {
-    // Insert fuse
-    if (GameState.inventory.fuse) {
-      repairGenerator();
-      GameState.inventory.fuse = false;
+function handleInteraction() {
+  const interactionRange = 5;
+  if (keyPickup && !GameState.inventory.key) {
+    if (player.position.distanceTo(keyPickup.position) < interactionRange) {
+      GameState.inventory.key = true;
+      scene.remove(keyPickup);
+      playSound("key_pickup");
+      updateObjective(1);
       updateInventoryUI();
+      return;
     }
-  } else if (itemType === 'key') {
-    // Unlock doors or rooms
   }
-}
-function dropItem(itemType) {
-  // Drop logic
-  if (GameState.inventory[itemType]) {
-    GameState.inventory[itemType] = false;
-    updateInventoryUI();
+  if (mansionDoor && GameState.inventory.key && !GameState.doorUnlocked) {
+    if (player.position.distanceTo(mansionDoor.position) < interactionRange) {
+      GameState.doorUnlocked = true;
+      playSound("door_open");
+      // दरवाजा खोलना
+      let angle = 0;
+      const animateOpen = setInterval(() => {
+        angle += 0.1;
+        mansionDoor.rotation.y = angle;
+        if (angle >= Math.PI / 2) {
+          clearInterval(animateOpen);
+          GameState.doorOpen = true;
+        }
+      }, 30);
+      updateInventoryUI();
+      return;
+    }
   }
-}
-function equipItem(itemType) {
-  // Equip logic if applicable
-}
-
-// ================== ENTER MANSION & ROOMS ==================
-function enterMansion() {
-  // Transition to interior
-  GameState.insideMansion = true;
-  createInterior();
-}
-function exitMansion() {
-  GameState.insideMansion = false;
-  // Remove interior objects
-}
-
-// ================== CREATE INTERIOR ==================
-function createInterior() {
-  // Create rooms, hallways, doors
-  // For simplicity, create a small room
-  const room = new THREE.Mesh(
-    new THREE.BoxGeometry(20, 10, 20),
-    new THREE.MeshStandardMaterial({ color: 0x4a4a4a })
-  );
-  room.position.set(0, 5, 0);
-  scene.add(room);
-  // Create doors, etc.
-}
-
-// ================== LOCKED ROOMS ==================
-function unlockRoom(roomName) {
-  if (GameState.inventory.key) {
-    GameState.lockedRooms[roomName] = false;
-    // Open door animation
-  }
-}
-function checkRoomAccess(roomName) {
-  return !GameState.lockedRooms[roomName];
-}
-
-// ================== BASEMENT SYSTEM ==================
-function createBasement() {
-  // Create basement entrance
-  // For simplicity, assume basement is below
-}
-function enterBasement() {
-  GameState.inBasement = true;
-  // Create basement interior
-}
-
-// ================== GENERATOR SYSTEM ==================
-function repairGenerator() {
-  if (GameState.generatorObject) {
-    // Animate repair
-    GameState.generatorOn = true;
-    // Possibly restore power
-  }
-}
-function turnGeneratorOn() {
-  if (GameState.generatorOn) {
-    // Enable power
-  }
-}
-
-// ================== ADVANCED GRANNY AI ==================
-function updateGrannyAI(delta) {
-  // Already implemented above
-}
-
-// ================== HEARING SYSTEM ==================
-function makeNoise(position, type) {
-  // Store last noise position
-  GameState.lastNoisePosition.copy(position);
-  // Play sound based on type
-  // e.g., door, running, jumping
-}
-function detectNoise() {
-  // Granny AI or enemies can investigate noise
-  if (GameState.hearingEnabled) {
-    // Implement detection logic
-    if (GameState.lastNoisePosition.distanceTo(granny.position) < 20) {
-      granny.userData.lastKnownPlayerPos.copy(GameState.lastNoisePosition);
-      GameState.enemyState = "investigate";
+  for (let i = 0; i < notesInWorld.length; i++) {
+    const note = notesInWorld[i];
+    if (player.position.distanceTo(note.position) < interactionRange) {
+      alert("NOTE: " + note.userData.text);
+      GameState.inventory.notesCollected++;
+      notesInWorld.splice(i, 1);
+      scene.remove(note);
+      updateInventoryUI();
+      return;
     }
   }
 }
-function investigateNoise(position) {
-  granny.userData.lastKnownPlayerPos.copy(position);
-  GameState.enemyState = "investigate";
+
+// ================== Gravity & Collisions ==================
+function updateGravity(delta) {
+  player.position.y += GameState.velocityY * delta;
+  GameState.velocityY -= 20 * delta;
+  const groundY = getTerrainHeight(player.position.x, player.position.z);
+  const floorY = groundY + WORLD.PLAYER_HEIGHT;
+  if (player.position.y <= floorY) {
+    player.position.y = floorY;
+    GameState.velocityY = 0;
+    GameState.isJumping = false;
+  }
+}
+function handleCollisions() {
+  const radius = 2.1;
+  for (const col of colliders) {
+    const dx = player.position.x - col.x;
+    const dz = player.position.z - col.z;
+    const distSq = dx * dx + dz * dz;
+    const minDist = radius + col.r;
+    if (distSq < minDist * minDist) {
+      player.position.x = lastSafePosition.x;
+      player.position.z = lastSafePosition.z;
+      return;
+    }
+  }
+}
+function avoidGrannyHardClip() {
+  for (const col of colliders) {
+    const dx = granny.position.x - col.x;
+    const dz = granny.position.z - col.z;
+    const distSq = dx * dx + dz * dz;
+    const minDist = 2.3 + col.r;
+    if (distSq < minDist * minDist) {
+      const dist = Math.sqrt(distSq) || 0.01;
+      granny.position.x = col.x + (dx / dist) * minDist;
+      granny.position.z = col.z + (dz / dist) * minDist;
+    }
+  }
+}
+function addCylinderCollider(x, z, r) {
+  colliders.push({ x, z, r });
+}
+function addBoxCollider(mesh) {
+  const box = new THREE.Box3().setFromObject(mesh);
+  const size = new THREE.Vector3();
+  const center = new THREE.Vector3();
+  box.getSize(size);
+  box.getCenter(center);
+  colliders.push({ x: center.x, z: center.z, r: Math.max(size.x, size.z) * 0.5 });
 }
 
-// ================== JUMPSCARE SYSTEM ==================
-function showJumpscare() {
-  // Show fullscreen jumpscare
-  if (jumpscareMesh) {
-    jumpscareMesh.style.display = "block";
-    GameState.jumpscareActive = true;
+// ================== कीबोर्ड और माउस ==================
+function keyDown(e) {
+  const k = e.key.toLowerCase();
+  if (k === "w") GameState.move.w = true;
+  if (k === "a") GameState.move.a = true;
+  if (k === "s") GameState.move.s = true;
+  if (k === "d") GameState.move.d = true;
+  if (k === "shift") GameState.running = true;
+  if (e.code === "Space") jump();
+  if (k === "f") toggleTorch();
+  if (k === "p") togglePause();
+  if (k === "e") handleInteraction();
+}
+function keyUp(e) {
+  const k = e.key.toLowerCase();
+  if (k === "w") GameState.move.w = false;
+  if (k === "a") GameState.move.a = false;
+  if (k === "s") GameState.move.s = false;
+  if (k === "d") GameState.move.d = false;
+  if (k === "shift") GameState.running = false;
+}
+function handleMouseLook(e) {
+  if (document.pointerLockElement !== document.body || GameState.paused) return;
+  GameState.yaw -= e.movementX * WORLD.MOUSE_SENSITIVITY;
+  GameState.pitch -= e.movementY * WORLD.MOUSE_SENSITIVITY;
+  GameState.pitch = Math.max(-1.5, Math.min(1.5, GameState.pitch));
+}
+function handlePointerLockChange() {
+  if (document.pointerLockElement !== document.body && GameState.started) {
+    GameState.move.w = false;
+    GameState.move.a = false;
+    GameState.move.s = false;
+    GameState.move.d = false;
+    GameState.running = false;
   }
 }
-function hideJumpscare() {
-  if (jumpscareMesh) {
-    jumpscareMesh.style.display = "none";
-    GameState.jumpscareActive = false;
+function requestPointerControl() {
+  if (!GameState.paused && GameState.started && document.body.requestPointerLock) {
+    document.body.requestPointerLock();
+  }
+}
+function togglePause() {
+  GameState.paused = !GameState.paused;
+  const pauseBtn = document.getElementById("pauseBtn");
+  if (pauseBtn) pauseBtn.innerHTML = GameState.paused ? "Play" : "Pause";
+  if (GameState.paused && document.exitPointerLock) document.exitPointerLock();
+  else requestPointerControl();
+}
+function toggleTorch() {
+  GameState.torchOn = !GameState.torchOn;
+  if (torchLight) torchLight.intensity = GameState.torchOn ? 3 : 0;
+  const torchBtn = document.getElementById("torchBtn");
+  if (torchBtn) torchBtn.innerHTML = GameState.torchOn ? "Torch ON" : "Torch OFF";
+}
+function jump() {
+  if (!GameState.isJumping && !GameState.paused) {
+    GameState.velocityY = 7;
+    GameState.isJumping = true;
+    playSound("footstep");
+    GameState.lastPlayerSound = { time: Date.now(), type: "jump" };
   }
 }
 
-// ================== SAVE SYSTEM ==================
-function saveGame() {
-  localStorage.setItem("saveData", JSON.stringify(GameState));
-}
-function loadGame() {
-  const data = localStorage.getItem("saveData");
-  if (data) {
-    Object.assign(GameState, JSON.parse(data));
+// ================== मोबाइल कंट्रोल्स ==================
+function setupMobileUiButtons() {
+  const runBtn = document.getElementById("runBtn");
+  if (runBtn) {
+    runBtn.addEventListener("touchstart", (e) => { e.preventDefault(); GameState.running = true; });
+    runBtn.addEventListener("touchend", (e) => { e.preventDefault(); GameState.running = false; });
+    runBtn.addEventListener("mousedown", () => (GameState.running = true));
+    runBtn.addEventListener("mouseup", () => (GameState.running = false));
+    runBtn.addEventListener("mouseleave", () => (GameState.running = false));
   }
 }
-function autoSave() {
-  saveGame();
+function createMobileControls() {
+  const joy = document.createElement("div");
+  joy.style.cssText = `
+    position: absolute;
+    left: 40px;
+    bottom: 40px;
+    width: 120px;
+    height: 120px;
+    border-radius: 50%;
+    background: rgba(255,255,255,0.25);
+    border: 2px solid rgba(255,255,255,0.5);
+    z-index: 999;
+    touch-action: none;
+  `;
+  document.body.appendChild(joy);
+  let startX = 0;
+  let startY = 0;
+  joy.addEventListener("touchstart", (e) => {
+    e.preventDefault();
+    GameState.joystick.active = true;
+    startX = e.touches[0].clientX;
+    startY = e.touches[0].clientY;
+  });
+  joy.addEventListener("touchmove", (e) => {
+    e.preventDefault();
+    GameState.joystick.dx = e.touches[0].clientX - startX;
+    GameState.joystick.dy = e.touches[0].clientY - startY;
+  });
+  joy.addEventListener("touchend", () => {
+    GameState.joystick.active = false;
+    GameState.joystick.dx = 0;
+    GameState.joystick.dy = 0;
+  });
+  const jumpBtn = document.createElement("button");
+  jumpBtn.innerHTML = "JUMP";
+  jumpBtn.style.cssText = `
+    position: absolute;
+    right: 40px;
+    bottom: 60px;
+    width: 90px;
+    height: 90px;
+    border-radius: 50%;
+    font-size: 18px;
+    z-index: 999;
+    touch-action: none;
+  `;
+  document.body.appendChild(jumpBtn);
+  jumpBtn.addEventListener("touchstart", (e) => {
+    e.preventDefault();
+    jump();
+  });
 }
 
-// ================== WEATHER SYSTEM ==================
-function startRain() {
-  // Show rain particle system
-  GameState.weatherState = "rain";
-}
-function stopRain() {
-  // Remove rain particles
-  GameState.weatherState = "clear";
-}
-function lightningStrike() {
-  // Flash lightning effect
-  if (weatherMesh) {
-    weatherMesh.style.display = "block";
-    setTimeout(() => { weatherMesh.style.display = "none"; }, 200);
-  }
-}
-
-// ================== DAY NIGHT CYCLE ==================
-function updateSun() {
-  // Animate sun position
-}
-function updateMoon() {
-  // Animate moon
-}
-function updateSky() {
-  // Change sky color/skybox
-}
-function updateDayNightCycle(delta) {
-  // Toggle day/night based on timer
-}
-
-// ================== ESCAPE SEQUENCE ==================
-function collectCarPart(part) {
-  GameState.inventory.carParts.push(part);
-  // Check if all parts collected
-}
-function repairVehicle() {
-  // Repair car
-  GameState.vehicleRepaired = true;
-}
-function startVehicle() {
-  if (GameState.vehicleRepaired) {
-    // Initiate escape sequence
-    escapeGame();
-  }
-}
-function escapeGame() {
-  // Trigger escape scene
-  alert("You escaped! Congratulations!");
-  // Show victory
-  showVictory();
-}
-
-// ================== AUDIO MANAGER ==================
-class AudioManager {
-  constructor() {
-    this.context = new (window.AudioContext || window.webkitAudioContext)();
-    this.sounds = {};
-  }
-  loadSound(name, url) {
-    // Load sound buffer
-  }
-  playSound(name) {
-    // Play loaded sound
-  }
-  stopSound(name) {
-    // Stop sound
-  }
-}
-GameState.audioManager = new AudioManager();
-
-// ================== SETTINGS ==================
-function changeVolume(value) {
-  GameState.volume = value;
-  // Apply to all sounds
-}
-function changeGraphics(quality) {
-  GameState.graphicsQuality = quality;
-  // Change renderer settings
-}
-function toggleFullscreen() {
-  if (!document.fullscreenElement) {
-    document.documentElement.requestFullscreen();
+// ================== UI अपडेट ==================
+function updateHealthUI() {
+  const healthValue = document.getElementById("healthValue");
+  const healthFill = document.getElementById("healthFill");
+  if (healthValue) healthValue.innerText = Math.ceil(GameState.health);
+  if (healthFill) healthFill.style.width = GameState.health + "%";
+  if (GameState.health < 30) {
+    document.getElementById("gameUI").classList.add("low-health");
   } else {
-    document.exitFullscreen();
+    document.getElementById("gameUI").classList.remove("low-health");
+  }
+  if (GameState.health <= 0) showGameOver();
+}
+function updateStaminaUI() {
+  const staminaFill = document.getElementById("staminaFill");
+  if (staminaFill) staminaFill.style.width = GameState.stamina + "%";
+}
+function updateBatteryUI() {
+  const torchIndicator = document.getElementById("torchIndicator");
+  if (torchIndicator) {
+    torchIndicator.innerText = GameState.torchOn ? "Torch: ON" : "Torch: OFF";
   }
 }
+function updateObjectiveUI() {
+  const obj = document.getElementById("objectiveText");
+  if (obj) obj.innerText = GameState.currentObjective;
+}
+function updateInventoryUI() {
+  const invKey = document.getElementById("inventoryKey");
+  const invNotes = document.getElementById("inventoryNotes");
+  if (invKey) invKey.style.display = GameState.inventory.key ? "block" : "none";
+  if (invNotes) invNotes.innerText = "Notes: " + GameState.inventory.notesCollected;
+}
 
-// ================== MAIN ANIMATION LOOP ==================
+// ================== गेम ओवर और विजय ==================
+function showGameOver() {
+  if (GameState.paused) return;
+  GameState.paused = true;
+  GameState.jumpscareStarted = true;
+  document.getElementById("gameUI").style.display = "none";
+  document.getElementById("gameOver").style.display = "flex";
+  if (document.exitPointerLock) document.exitPointerLock();
+  playSound("jumpscare");
+  console.log("💀 गेम ओवर! ग्रैनी ने पकड़ा!");
+}
+function showVictory() {
+  if (GameState.paused) return;
+  GameState.paused = true;
+  document.getElementById("gameUI").style.display = "none";
+  document.getElementById("victory").style.display = "flex";
+  if (document.exitPointerLock) document.exitPointerLock();
+  playSound("door_open");
+  setTimeout(() => {
+    playSound("jumpscare");
+    alert("तुम भाग गए... लेकिन वो अभी भी तुम्हारे पीछे है...");
+  }, 2000);
+}
+function damagePlayer(amount) {
+  GameState.health = Math.max(0, GameState.health - amount);
+  playSound("damage");
+  updateHealthUI();
+  const gameUI = document.getElementById("gameUI");
+  gameUI.style.filter = "brightness(0.7)";
+  setTimeout(() => { gameUI.style.filter = "brightness(1)"; }, 200);
+  if (GameState.health <= 0) showGameOver();
+}
+function restartGame() {
+  location.reload();
+}
+function backToMenu() {
+  location.reload();
+}
+
+// ================== आकार और रेंडर ==================
+function onResize() {
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+}
 function animate() {
   requestAnimationFrame(animate);
   const delta = Math.min(clock.getDelta(), 0.05);
@@ -1247,24 +1272,14 @@ function animate() {
     updateStaminaUI();
     updateBatteryUI();
     updateWeather(delta);
-    updateSky(delta);
+    updateSky();
     updateDayNightCycle(delta);
     handleJumpscare(delta);
   }
   renderer.render(scene, camera);
 }
 
-// ================== HANDLERS ==================
-function handleJumpscare(delta) {
-  if (GameState.jumpscareActive) {
-    GameState.jumpscareTimer += delta;
-    if (GameState.jumpscareTimer > 2) {
-      hideJumpscare();
-    }
-  }
-}
-
-// ================== STARTUP ==================
+// ================== मुख्य शुरुआत ==================
 window.onload = () => {
   startGame();
 };
