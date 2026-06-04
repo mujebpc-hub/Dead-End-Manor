@@ -644,19 +644,25 @@ function createNotes() {
 // ✅ FIXED: GRANNY CREATION FUNCTION
 // ============================================
 
-function createGranny() {
-  // ✅ Create granny group
-  granny = new THREE.Group();
+function loadGrannyTexture(callback) {
+  const textureLoader = new THREE.TextureLoader();
 
-  // ✅ Wait for texture to load (use grannyTexture variable)
-  const grannyGeometry = new THREE.PlaneGeometry(4.5, 7);
-  
-  const grannyMaterial = new THREE.MeshStandardMaterial({
-    map: grannyTexture,  // ✅ Use already loaded texture
-    transparent: true,
-    alphaTest: 0.5,
-    side: THREE.DoubleSide
-  });
+  textureLoader.load(
+    "textures/GrannyG1New.webp",
+    (texture) => {
+      grannyTexture = texture;
+      grannyTexture.transparent = true;
+
+      if(callback) callback();
+    },
+    undefined,
+    (err)=>{
+      console.error("Failed to load Granny texture",err);
+
+      if(callback) callback();
+    }
+  );
+}
 
   // ✅ Create sprite
   const grannySprite = new THREE.Mesh(grannyGeometry, grannyMaterial);
