@@ -155,12 +155,9 @@ function initGame() {
   // ========== LIGHTING - DAY SCENE ==========
   setupDayLighting();
 
-  // ========== LOAD GRANNY TEXTURE ==========
-  loadGrannyTexture();
-
-  // ========== CREATE WORLD ==========
-  createWorld();
-
+  // LOAD GRANNY TEXTURE + CREATE WORLD
+loadGrannyTexture(() => {
+});
   // ========== SETUP PLAYER ==========
   setupPlayer();
 
