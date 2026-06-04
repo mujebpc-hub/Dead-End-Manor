@@ -634,33 +634,25 @@ function createNotes() {
 // ✅ FIXED: GRANNY CREATION FUNCTION
 // ============================================
 
-function loadGrannyTexture(callback) {
-  const textureLoader = new THREE.TextureLoader();
+function createGranny() {
 
-  textureLoader.load(
-    "textures/GrannyG1New.webp",
-    (texture) => {
-      grannyTexture = texture;
-      grannyTexture.transparent = true;
+  granny = new THREE.Group();
 
-      if(callback) callback();
-    },
-    undefined,
-    (err)=>{
-      console.error("Failed to load Granny texture",err);
+  const grannyGeometry = new THREE.PlaneGeometry(4, 7);
 
-      if(callback) callback();
-    }
+  const grannyMaterial = new THREE.MeshStandardMaterial({
+    map: grannyTexture,
+    transparent: true,
+    side: THREE.DoubleSide
+  });
+
+  const grannySprite = new THREE.Mesh(
+    grannyGeometry,
+    grannyMaterial
   );
-}
 
-  // ✅ Create sprite
-  const grannySprite = new THREE.Mesh(grannyGeometry, grannyMaterial);
   grannySprite.position.set(0, 3.5, 0);
-  grannySprite.castShadow = true;
-  grannySprite.receiveShadow = true;
 
-  // ✅ Create invisible collision body
   const collider = new THREE.Mesh(
     new THREE.CylinderGeometry(0.8, 0.8, 6, 8),
     new THREE.MeshBasicMaterial({
@@ -668,23 +660,25 @@ function loadGrannyTexture(callback) {
       opacity: 0
     })
   );
+
   collider.position.y = 3;
 
-  // ✅ Add children to granny group
   granny.add(collider);
   granny.add(grannySprite);
 
-  // ✅ Set position and stats
-  granny.position.set(80, getTerrainHeight(80, -200), -200);
+  granny.position.set(
+    80,
+    getTerrainHeight(80, -200),
+    -200
+  );
+
   granny.userData.speed = GRANNY.PATROL_SPEED;
   granny.userData.lastKnownPlayerPos = new THREE.Vector3();
   granny.userData.canSeePlayer = false;
   granny.userData.isAttacking = false;
-  
-  // ✅ Add to scene
+
   scene.add(granny);
-  
-  // ✅ Start patrol
+
   pickGrannyPatrolTarget();
 }
 
