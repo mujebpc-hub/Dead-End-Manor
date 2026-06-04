@@ -186,16 +186,6 @@ function initGame() {
 // GRANNY TEXTURE LOADING
 // ============================================
 
-function loadGrannyTexture() {
-  const textureLoader = new THREE.TextureLoader();
-  
-  // ✅ LOAD GRANNY PNG TEXTURE
-  textureLoader.load('textures/GrannyG1New.webp', (texture) => {
-    grannyTexture = texture;
-    texture.transparent = true;
-  });
-}
-
 function setupDayLighting() {
   // ✅ BRIGHT AMBIENT LIGHT
   scene.add(new THREE.AmbientLight(0xffffff, 0.8));
