@@ -156,8 +156,11 @@ function initGame() {
   setupDayLighting();
 
   // LOAD GRANNY TEXTURE + CREATE WORLD
-loadGrannyTexture(() => {
-});
+  loadGrannyTexture(() => {
+    // ✅ Ensure grannyTexture is loaded before creating granny
+    createGranny(); // Call after texture load
+  });
+
   // ========== SETUP PLAYER ==========
   setupPlayer();
 
@@ -177,71 +180,69 @@ loadGrannyTexture(() => {
   updateBatteryUI();
   updateObjectiveUI();
   updateInventoryUI();
+
+  // Call createWorld() after setup
+  createWorld();
 }
 
 // ============================================
 // GRANNY TEXTURE LOADING
 // ============================================
 
-function setupDayLighting() {
-  // ✅ BRIGHT AMBIENT LIGHT
-  scene.add(new THREE.AmbientLight(0xffffff, 0.8));
+function loadGrannyTexture(callback) {
+  const loader = new THREE.TextureLoader();
+  loader.load('textures/granny.png', (texture) => {
+    grannyTexture = texture;
+    callback();
+  });
+}
 
-  // ✅ SUN DIRECTIONAL LIGHT
+// ============================================
+// DAYLIGHT SETUP
+// ============================================
+
+function setupDayLighting() {
+  scene.add(new THREE.AmbientLight(0xffffff, 0.8));
   const sun = new THREE.DirectionalLight(0xffffff, 1.2);
   sun.position.set(200, 300, 150);
   sun.castShadow = true;
   sun.shadow.mapSize.set(4096, 4096);
   sun.shadow.camera.near = 0.5;
   sun.shadow.camera.far = 800;
-  sun.shadow.camera.left = -500;
-  sun.shadow.camera.right = 500;
-  sun.shadow.camera.top = 500;
-  sun.shadow.camera.bottom = -500;
   scene.add(sun);
-
-  // ✅ VISUAL SUN IN SKY
-  const sunGeometry = new THREE.SphereGeometry(40, 32, 32);
-  const sunMaterial = new THREE.MeshBasicMaterial({ color: 0xFFD700 });
-  const sunMesh = new THREE.Mesh(sunGeometry, sunMaterial);
+  // Sun visual in sky
+  const sunMesh = new THREE.Mesh(new THREE.SphereGeometry(40, 32, 32),
+    new THREE.MeshBasicMaterial({ color: 0xFFD700 }));
   sunMesh.position.set(200, 400, -500);
   scene.add(sunMesh);
-
-  // ✅ SUN GLOW
-  const glowGeometry = new THREE.SphereGeometry(50, 32, 32);
-  const glowMaterial = new THREE.MeshBasicMaterial({
-    color: 0xFFA500,
-    transparent: true,
-    opacity: 0.15
-  });
-  const sunGlow = new THREE.Mesh(glowGeometry, glowMaterial);
-  sunGlow.position.copy(sunMesh.position);
-  scene.add(sunGlow);
-
-  // ✅ ADD CLOUDS
+  // Sun glow
+  const glow = new THREE.Mesh(new THREE.SphereGeometry(50, 32, 32),
+    new THREE.MeshBasicMaterial({ color: 0xFFA500, transparent: true, opacity: 0.15 }));
+  glow.position.copy(sunMesh.position);
+  scene.add(glow);
   createClouds();
 }
 
+// ============================================
+// CREATE CLOUDS
+// ============================================
+
 function createClouds() {
   const cloudTexture = createCloudTexture();
-
   for (let i = 0; i < 8; i++) {
-    const cloudGeometry = new THREE.PlaneGeometry(150, 80);
-    const cloudMaterial = new THREE.MeshStandardMaterial({
-      map: cloudTexture,
-      emissive: 0xffffff,
-      emissiveIntensity: 0.6,
-      transparent: true
-    });
-
-    const cloud = new THREE.Mesh(cloudGeometry, cloudMaterial);
+    const cloud = new THREE.Mesh(
+      new THREE.PlaneGeometry(150, 80),
+      new THREE.MeshStandardMaterial({
+        map: cloudTexture,
+        transparent: true
+      })
+    );
     cloud.position.set(
       (Math.random() - 0.5) * 1000,
       200 + Math.random() * 150,
       (Math.random() - 0.5) * 800
     );
     cloud.rotation.z = Math.random() * Math.PI;
-    cloud.castShadow = false;
     scene.add(cloud);
   }
 }
@@ -251,38 +252,33 @@ function createCloudTexture() {
   canvas.width = 256;
   canvas.height = 128;
   const ctx = canvas.getContext("2d");
-
   ctx.fillStyle = "rgba(255, 255, 255, 0.8)";
   ctx.filter = "blur(5px)";
-
   for (let i = 0; i < 30; i++) {
-    const x = Math.random() * canvas.width;
-    const y = Math.random() * canvas.height;
-    const size = Math.random() * 40 + 20;
-    ctx.fillRect(x, y, size, size);
+    ctx.fillRect(Math.random() * canvas.width, Math.random() * canvas.height, Math.random() * 40 + 20, Math.random() * 40 + 20);
   }
-
-  const texture = new THREE.CanvasTexture(canvas);
-  return texture;
+  return new THREE.CanvasTexture(canvas);
 }
+
+// ============================================
+// PLAYER SETUP
+// ============================================
 
 function setupPlayer() {
   player = new THREE.Object3D();
-  player.position.set(
-    0,
-    getTerrainHeight(0, 20) + WORLD.PLAYER_HEIGHT,
-    20
-  );
+  player.position.set(getTerrainHeight(0, 20) + WORLD.PLAYER_HEIGHT, 0, 20);
   lastSafePosition.copy(player.position);
   scene.add(player);
-
   player.add(camera);
   camera.position.set(0, WORLD.EYE_HEIGHT, 0);
   camera.rotation.order = "YXZ";
 }
 
+// ============================================
+// TORCH SETUP
+// ============================================
+
 function setupTorch() {
-  // ✅ DAY MODE - TORCH IS WEAKER BUT STILL USEFUL
   torchLight = new THREE.SpotLight(0xffffff, 0, 200, Math.PI / 4.5, 0.5, 2);
   torchLight.shadow.mapSize.set(2048, 2048);
   torchLight.shadow.camera.near = 0.1;
@@ -291,8 +287,12 @@ function setupTorch() {
   camera.add(torchLight.target);
   torchLight.target.position.set(0, 0, -1);
   GameState.torchOn = true;
-  torchLight.intensity = 3; // ✅ Reduced for day
+  torchLight.intensity = 3; // DAY MODE - WEAKER
 }
+
+// ============================================
+// EVENT LISTENERS
+// ============================================
 
 function setupEventListeners() {
   window.addEventListener("keydown", keyDown);
@@ -317,26 +317,20 @@ function initAudioContext() {
 
 function createSound(frequency, duration, type = "sine") {
   if (!audioContext) return;
-
   const osc = audioContext.createOscillator();
   const gain = audioContext.createGain();
-
   osc.connect(gain);
   gain.connect(audioContext.destination);
-
   osc.frequency.value = frequency;
   osc.type = type;
-
   gain.gain.setValueAtTime(0.1, audioContext.currentTime);
   gain.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + duration);
-
   osc.start(audioContext.currentTime);
   osc.stop(audioContext.currentTime + duration);
 }
 
 function playSound(soundName) {
   if (!audioContext) return;
-
   switch (soundName) {
     case "heartbeat":
       createSound(60, 0.3, "sine");
@@ -384,14 +378,8 @@ function playSound(soundName) {
   }
 }
 
-function playRandomHorrorSound() {
-  const sounds = ["ghost_whisper", "distant_scream", "wind", "tree_creak"];
-  const randomSound = sounds[Math.floor(Math.random() * sounds.length)];
-  playSound(randomSound);
-}
-
 // ============================================
-// WORLD GENERATION
+// WORLD CREATION
 // ============================================
 
 function createWorld() {
@@ -404,6 +392,10 @@ function createWorld() {
   createNotes();
   createShadowFigure();
 }
+
+// ============================================
+// TERRAIN & ENVIRONMENT
+// ============================================
 
 function getTerrainHeight(x, z) {
   return (
@@ -419,19 +411,15 @@ function createTerrain() {
   grass.wrapS = THREE.RepeatWrapping;
   grass.wrapT = THREE.RepeatWrapping;
   grass.repeat.set(90, 110);
-
   const geometry = new THREE.PlaneGeometry(WORLD.WIDTH, WORLD.DEPTH, 140, 160);
   geometry.rotateX(-Math.PI / 2);
-
   const pos = geometry.attributes.position;
   for (let i = 0; i < pos.count; i++) {
     const x = pos.getX(i);
     const z = pos.getZ(i);
     pos.setY(i, getTerrainHeight(x, z));
   }
-
   geometry.computeVertexNormals();
-
   const ground = new THREE.Mesh(
     geometry,
     new THREE.MeshStandardMaterial({ map: grass, roughness: 1 })
@@ -449,6 +437,10 @@ function createTerrain() {
   road.receiveShadow = true;
   scene.add(road);
 }
+
+// ============================================
+// MANSION & INTERIORS
+// ============================================
 
 function createMansion() {
   const mansion = new THREE.Mesh(
@@ -500,9 +492,12 @@ function createMansionInterior(mansionPos) {
   scene.add(room2);
 }
 
+// ============================================
+// TREES, FOREST, ROCKS, SHADOW FIGURE, KEY, NOTES
+// ============================================
+
 function createTree(x, z) {
   const groundY = getTerrainHeight(x, z);
-
   const trunk = new THREE.Mesh(
     new THREE.CylinderGeometry(0.6, 0.9, 7, 8),
     new THREE.MeshStandardMaterial({ color: 0x6B4423 })
@@ -511,10 +506,9 @@ function createTree(x, z) {
   trunk.castShadow = true;
   scene.add(trunk);
   addCylinderCollider(x, z, 2.2);
-
   const leaves = new THREE.Mesh(
     new THREE.ConeGeometry(4.5, 9, 8),
-    new THREE.MeshStandardMaterial({ color: 0x228B22 }) // ✅ Green leaves
+    new THREE.MeshStandardMaterial({ color: 0x228B22 })
   );
   leaves.position.set(x, groundY + 10, z);
   leaves.castShadow = true;
@@ -525,10 +519,8 @@ function createForest() {
   for (let i = 0; i < 360; i++) {
     const x = Math.random() * WORLD.WIDTH - WORLD.WIDTH / 2;
     const z = Math.random() * WORLD.DEPTH - WORLD.DEPTH / 2;
-
     if (Math.abs(x) < 85 && z > -500 && z < -340) continue;
     if (Math.abs(x) < 25 && z > -360 && z < 120) continue;
-
     createTree(x, z);
   }
 }
@@ -538,7 +530,6 @@ function createRocks() {
     const x = Math.random() * WORLD.WIDTH - WORLD.WIDTH / 2;
     const z = Math.random() * WORLD.DEPTH - WORLD.DEPTH / 2;
     const size = Math.random() * 3.5 + 1.3;
-
     const rock = new THREE.Mesh(
       new THREE.DodecahedronGeometry(size),
       new THREE.MeshStandardMaterial({ color: 0x808080, roughness: 1 })
@@ -554,33 +545,25 @@ function createRocks() {
 
 function createShadowFigure() {
   shadowFigure = new THREE.Group();
-
+  // BODY
   const body = new THREE.Mesh(
     new THREE.CylinderGeometry(1, 1.5, 6, 8),
-    new THREE.MeshStandardMaterial({
-      color: 0x1a1a1a,
-      transparent: true,
-      opacity: 0.3
-    })
+    new THREE.MeshStandardMaterial({ color: 0x1a1a1a, transparent: true, opacity: 0.3 })
   );
   body.position.y = 3;
   shadowFigure.add(body);
-
+  // HEAD
   const head = new THREE.Mesh(
     new THREE.SphereGeometry(1, 8, 8),
-    new THREE.MeshStandardMaterial({
-      color: 0x0a0a0a,
-      transparent: true,
-      opacity: 0.3
-    })
+    new THREE.MeshStandardMaterial({ color: 0x0a0a0a, transparent: true, opacity: 0.3 })
   );
   head.position.y = 7;
   shadowFigure.add(head);
-
+  // SHADOW FIGURE POSITION
   shadowFigure.position.set(
-    Math.random() * 200 - 100,
+    Math.random() * 300 - 150,
     getTerrainHeight(0, -200),
-    -200 + Math.random() * 100
+    -200 + Math.random() * 150
   );
   shadowFigure.userData.visible = false;
   scene.add(shadowFigure);
@@ -588,11 +571,7 @@ function createShadowFigure() {
 
 function createKey() {
   const keyGeometry = new THREE.BoxGeometry(0.8, 1.5, 0.2);
-  const keyMaterial = new THREE.MeshStandardMaterial({
-    color: 0xFFD700,
-    metalness: 0.8
-  });
-
+  const keyMaterial = new THREE.MeshStandardMaterial({ color: 0xFFD700, metalness: 0.8 });
   keyPickup = new THREE.Mesh(keyGeometry, keyMaterial);
   keyPickup.position.set(50, getTerrainHeight(50, 100) + 2, 100);
   keyPickup.castShadow = true;
@@ -607,18 +586,15 @@ function createNotes() {
     "IT WATCHES... ALWAYS",
     "THE KEY IS HIDDEN"
   ];
-
   for (let i = 0; i < 3; i++) {
     const notePos = new THREE.Vector3(
       Math.random() * 200 - 100,
       getTerrainHeight(Math.random() * 200 - 100, Math.random() * 200 - 100) + 1,
       Math.random() * 200 - 100
     );
-
     const noteGeometry = new THREE.BoxGeometry(1, 1.5, 0.1);
     const noteMaterial = new THREE.MeshStandardMaterial({ color: 0xD4A574 });
     const note = new THREE.Mesh(noteGeometry, noteMaterial);
-
     note.position.copy(notePos);
     note.userData.type = "note";
     note.userData.text = noteTexts[i];
@@ -628,54 +604,36 @@ function createNotes() {
 }
 
 // ============================================
-// ✅ FIXED: GRANNY CREATION FUNCTION
+// CREATE GRANNY
 // ============================================
 
 function createGranny() {
-
+  if (!grannyTexture) {
+    console.error("Granny texture not loaded!");
+    return;
+  }
   granny = new THREE.Group();
-
   const grannyGeometry = new THREE.PlaneGeometry(4, 7);
-
   const grannyMaterial = new THREE.MeshStandardMaterial({
     map: grannyTexture,
     transparent: true,
     side: THREE.DoubleSide
   });
-
-  const grannySprite = new THREE.Mesh(
-    grannyGeometry,
-    grannyMaterial
-  );
-
+  const grannySprite = new THREE.Mesh(grannyGeometry, grannyMaterial);
   grannySprite.position.set(0, 3.5, 0);
-
   const collider = new THREE.Mesh(
     new THREE.CylinderGeometry(0.8, 0.8, 6, 8),
-    new THREE.MeshBasicMaterial({
-      transparent: true,
-      opacity: 0
-    })
+    new THREE.MeshBasicMaterial({ transparent: true, opacity: 0 })
   );
-
   collider.position.y = 3;
-
   granny.add(collider);
   granny.add(grannySprite);
-
-  granny.position.set(
-    80,
-    getTerrainHeight(80, -200),
-    -200
-  );
-
+  granny.position.set(80, getTerrainHeight(80, -200), -200);
   granny.userData.speed = GRANNY.PATROL_SPEED;
   granny.userData.lastKnownPlayerPos = new THREE.Vector3();
   granny.userData.canSeePlayer = false;
   granny.userData.isAttacking = false;
-
   scene.add(granny);
-
   pickGrannyPatrolTarget();
 }
 
@@ -684,47 +642,32 @@ function createGranny() {
 // ============================================
 
 function detectPlayer() {
+  if (!granny || !player) return false;
   const distance = granny.position.distanceTo(player.position);
-
-  // ✅ CLOSE RANGE DETECTION (Always detects if too close)
-  if (distance < GRANNY.DETECTION_RANGE * 0.5) return true;
-
-  // ✅ VISION CONE DETECTION
+  if (distance < GRANNY.DETECTION_RANGE * 0.5) return true; // Close range detection
   const toPlayer = new THREE.Vector3().subVectors(player.position, granny.position);
   toPlayer.y = 0;
-
   if (toPlayer.length() < GRANNY.DETECTION_RANGE) {
     toPlayer.normalize();
-    const grannyForward = new THREE.Vector3(0, 0, -1).applyQuaternion(
-      granny.quaternion
-    );
+    const grannyForward = new THREE.Vector3(0, 0, -1).applyQuaternion(granny.quaternion);
     grannyForward.y = 0;
     grannyForward.normalize();
-
-    // ✅ CHECK IF PLAYER IS IN VISION CONE (120 degrees)
     const visionCone = (GRANNY.VISION_CONE_ANGLE * Math.PI) / 180 / 2;
     if (grannyForward.dot(toPlayer) > Math.cos(visionCone)) return true;
   }
-
-  // ✅ SOUND DETECTION
+  // SOUND DETECTION
   if (GameState.lastPlayerSound.type === "footstep" && distance < GRANNY.DETECTION_RANGE * 1.2) return true;
   if (GameState.lastPlayerSound.type === "run" && distance < GRANNY.DETECTION_RANGE * 1.5) return true;
   if (GameState.lastPlayerSound.type === "jump" && distance < GRANNY.DETECTION_RANGE * 1.3) return true;
-
   return false;
 }
 
 function updateGrannyAI(delta) {
   if (!granny || GameState.jumpscareStarted) return;
-
   const distance = granny.position.distanceTo(player.position);
-
-  // ✅ COOLDOWN FOR ATTACK
   if (GameState.attackCooldown > 0) {
     GameState.attackCooldown -= delta;
   }
-
-  // ✅ KILL CHECK - ATTACK IN RANGE
   if (distance < GRANNY.ATTACK_RANGE) {
     if (GameState.attackCooldown <= 0) {
       attackPlayer();
@@ -733,47 +676,32 @@ function updateGrannyAI(delta) {
     GameState.enemyState = "attack";
     return;
   }
-
-  // ✅ DETECTION FLOW
   if (GameState.enemyState !== "chase" && detectPlayer()) {
     GameState.enemyState = "chase";
     GameState.lastDetectionTime = Date.now();
     playSound("chase_music");
     playSound("granny_scream");
   }
-
-  // ✅ CHASE TO INVESTIGATE
   if (GameState.enemyState === "chase" && distance > GRANNY.CHASE_RANGE) {
     GameState.enemyState = "investigate";
     granny.userData.lastKnownPlayerPos.copy(player.position);
     GameState.enemyInvestigating = true;
     GameState.investigateTimer = 8;
   }
-
-  // ✅ INVESTIGATE TO PATROL
   if (GameState.enemyState === "investigate" && GameState.investigateTimer <= 0) {
     GameState.enemyState = "patrol";
     GameState.enemyInvestigating = false;
     pickGrannyPatrolTarget();
   }
-
-  // ✅ INVESTIGATE TIMER
   if (GameState.enemyInvestigating) {
     GameState.investigateTimer -= delta;
   }
-
-  // ✅ STATES
   if (GameState.enemyState === "patrol") patrolGranny(delta);
   if (GameState.enemyState === "investigate") investigateGranny(delta);
   if (GameState.enemyState === "chase") chasePlayer(delta);
-
   granny.position.y = getTerrainHeight(granny.position.x, granny.position.z) + 0.5;
   updateDangerLevel(distance);
-
-  // ✅ GRANNY BILLBOARD - ALWAYS FACE PLAYER
   granny.lookAt(player.position.x, granny.position.y, player.position.z);
-
-  // ✅ RANDOM SOUNDS
   if (Math.random() < 0.001 && GameState.enemyState === "patrol") {
     playRandomHorrorSound();
   }
@@ -782,7 +710,6 @@ function updateGrannyAI(delta) {
 function investigateGranny(delta) {
   const investigatePos = granny.userData.lastKnownPlayerPos;
   const dist = granny.position.distanceTo(investigatePos);
-
   if (dist < 12) {
     if (Math.random() > 0.7) {
       pickGrannyPatrolTarget();
@@ -791,11 +718,9 @@ function investigateGranny(delta) {
     }
     return;
   }
-
   const dir = new THREE.Vector3().subVectors(investigatePos, granny.position);
   dir.y = 0;
   dir.normalize();
-
   granny.position.addScaledVector(dir, GRANNY.PATROL_SPEED * 1.5 * delta);
   granny.lookAt(investigatePos.x, granny.position.y, investigatePos.z);
   avoidGrannyHardClip();
@@ -804,23 +729,16 @@ function investigateGranny(delta) {
 function patrolGranny(delta) {
   GameState.enemyPauseTimer -= delta;
   if (GameState.enemyPauseTimer > 0) return;
-
   const dir = new THREE.Vector3().subVectors(grannyTarget, granny.position);
   dir.y = 0;
-
   if (dir.length() < 8) {
     GameState.enemyPauseTimer = 2 + Math.random() * 3;
     pickGrannyPatrolTarget();
     return;
   }
-
   dir.normalize();
   granny.position.addScaledVector(dir, GRANNY.PATROL_SPEED * delta);
-  granny.lookAt(
-    granny.position.x + dir.x,
-    granny.position.y,
-    granny.position.z + dir.z
-  );
+  granny.lookAt(granny.position.x + dir.x, granny.position.y, granny.position.z + dir.z);
   avoidGrannyHardClip();
 }
 
@@ -828,7 +746,6 @@ function chasePlayer(delta) {
   const dir = new THREE.Vector3().subVectors(player.position, granny.position);
   dir.y = 0;
   dir.normalize();
-
   granny.position.addScaledVector(dir, GRANNY.CHASE_SPEED * delta);
   granny.lookAt(player.position.x, granny.position.y, player.position.z);
   avoidGrannyHardClip();
@@ -836,11 +753,9 @@ function chasePlayer(delta) {
 
 function attackPlayer() {
   const distance = granny.position.distanceTo(player.position);
-  
   if (distance < GRANNY.ATTACK_RANGE + 2) {
     playSound("granny_attack");
     damagePlayer(GRANNY.ATTACK_DAMAGE);
-    
     console.log(`🔴 GRANNY ATTACKED! Health: ${GameState.health}`);
   }
 }
@@ -855,7 +770,7 @@ function pickGrannyPatrolTarget() {
 }
 
 // ============================================
-// DANGER SYSTEM
+// DANGER & UI SYSTEM
 // ============================================
 
 function updateDangerLevel(distance) {
@@ -878,9 +793,7 @@ function updateDangerLevel(distance) {
 
 function applyDangerUI(level) {
   const gameUI = document.getElementById("gameUI");
-
   gameUI.classList.remove("enemy-near", "danger-shake");
-
   if (level === "high" || level === "critical") {
     gameUI.classList.add("enemy-near");
   }
@@ -895,10 +808,8 @@ function applyDangerUI(level) {
 
 function updateHorrorEvents(delta) {
   GameState.horrorEventTimer -= delta;
-
   if (GameState.horrorEventTimer <= 0) {
     const eventType = Math.floor(Math.random() * 4);
-
     if (eventType === 0 && shadowFigure && !shadowFigure.userData.visible) {
       shadowFigure.userData.visible = true;
       shadowFigure.position.set(
@@ -921,7 +832,6 @@ function updateHorrorEvents(delta) {
     } else if (eventType === 3) {
       playRandomHorrorSound();
     }
-
     GameState.horrorEventTimer = 15 + Math.random() * 20;
   }
 }
@@ -937,14 +847,8 @@ function updatePlayer(delta) {
   lastSafePosition.copy(player.position);
 
   const currentSpeed = GameState.running ? WORLD.RUN_SPEED : WORLD.WALK_SPEED;
-  const forward = new THREE.Vector3(0, 0, -1).applyAxisAngle(
-    new THREE.Vector3(0, 1, 0),
-    GameState.yaw
-  );
-  const right = new THREE.Vector3(1, 0, 0).applyAxisAngle(
-    new THREE.Vector3(0, 1, 0),
-    GameState.yaw
-  );
+  const forward = new THREE.Vector3(0, 0, -1).applyAxisAngle(new THREE.Vector3(0, 1, 0), GameState.yaw);
+  const right = new THREE.Vector3(1, 0, 0).applyAxisAngle(new THREE.Vector3(0, 1, 0), GameState.yaw);
   const direction = new THREE.Vector3();
 
   if (GameState.move.w) direction.add(forward);
@@ -974,7 +878,7 @@ function updatePlayer(delta) {
 
     if (GameState.running) {
       GameState.lastPlayerSound = { time: Date.now(), type: "run" };
-    } else if (direction.lengthSq() > 0) {
+    } else {
       GameState.lastPlayerSound = { time: Date.now(), type: "footstep" };
     }
   }
@@ -995,7 +899,6 @@ function updatePlayer(delta) {
 function checkInteractions() {
   const interactionRange = 5;
   const interactionText = document.getElementById("interactionText");
-
   let nearItem = false;
 
   if (keyPickup && !GameState.inventory.key) {
@@ -1088,25 +991,23 @@ function handleInteraction() {
 
 function updateObjective(stage) {
   GameState.objectiveStage = stage;
-
   const stages = [
     "Find the Mansion Key",
     "Reach the Mansion",
     "Unlock the Door",
     "Escape the Island"
   ];
-
   GameState.currentObjective = stages[stage] || stages[0];
   updateObjectiveUI();
 }
 
 // ============================================
-// PHYSICS
+// PHYSICS & COLLISIONS
 // ============================================
 
 function updateGravity(delta) {
   player.position.y += GameState.velocityY * delta;
-  GameState.velocityY -= 20 * delta;
+  GameState.velocityY -= 20 * delta; // gravity
 
   const groundY = getTerrainHeight(player.position.x, player.position.z);
   const floorY = groundY + WORLD.PLAYER_HEIGHT;
@@ -1120,14 +1021,13 @@ function updateGravity(delta) {
 
 function handleCollisions() {
   const radius = 2.1;
-
   for (const col of colliders) {
     const dx = player.position.x - col.x;
     const dz = player.position.z - col.z;
     const distSq = dx * dx + dz * dz;
     const minDist = radius + col.r;
-
     if (distSq < minDist * minDist) {
+      // Reset position if collided
       player.position.x = lastSafePosition.x;
       player.position.z = lastSafePosition.z;
       return;
@@ -1141,7 +1041,6 @@ function avoidGrannyHardClip() {
     const dz = granny.position.z - col.z;
     const distSq = dx * dx + dz * dz;
     const minDist = 2.3 + col.r;
-
     if (distSq < minDist * minDist) {
       const dist = Math.sqrt(distSq) || 0.01;
       granny.position.x = col.x + (dx / dist) * minDist;
@@ -1187,7 +1086,6 @@ function keyDown(e) {
 
 function keyUp(e) {
   const key = e.key.toLowerCase();
-
   if (key === "w") GameState.move.w = false;
   if (key === "a") GameState.move.a = false;
   if (key === "s") GameState.move.s = false;
@@ -1197,7 +1095,6 @@ function keyUp(e) {
 
 function handleMouseLook(e) {
   if (document.pointerLockElement !== document.body || GameState.paused) return;
-
   GameState.yaw -= e.movementX * WORLD.MOUSE_SENSITIVITY;
   GameState.pitch -= e.movementY * WORLD.MOUSE_SENSITIVITY;
   GameState.pitch = Math.max(-1.5, Math.min(1.5, GameState.pitch));
@@ -1221,10 +1118,8 @@ function requestPointerControl() {
 
 function togglePause() {
   GameState.paused = !GameState.paused;
-
   const pauseBtn = document.getElementById("pauseBtn");
   if (pauseBtn) pauseBtn.innerHTML = GameState.paused ? "Play" : "Pause";
-
   if (GameState.paused && document.exitPointerLock) {
     document.exitPointerLock();
   } else {
@@ -1235,7 +1130,6 @@ function togglePause() {
 function toggleTorch() {
   GameState.torchOn = !GameState.torchOn;
   if (torchLight) torchLight.intensity = GameState.torchOn ? 3 : 0;
-
   const torchBtn = document.getElementById("torchBtn");
   if (torchBtn) torchBtn.innerHTML = GameState.torchOn ? "Torch ON" : "Torch OFF";
 }
@@ -1255,7 +1149,6 @@ function jump() {
 
 function setupMobileUiButtons() {
   const runBtn = document.getElementById("runBtn");
-
   if (runBtn) {
     runBtn.addEventListener("touchstart", (e) => {
       e.preventDefault();
@@ -1286,29 +1179,24 @@ function createMobileControls() {
     touch-action: none;
   `;
   document.body.appendChild(joy);
-
   let startX = 0;
   let startY = 0;
-
   joy.addEventListener("touchstart", (e) => {
     e.preventDefault();
     GameState.joystick.active = true;
     startX = e.touches[0].clientX;
     startY = e.touches[0].clientY;
   });
-
   joy.addEventListener("touchmove", (e) => {
     e.preventDefault();
     GameState.joystick.dx = e.touches[0].clientX - startX;
     GameState.joystick.dy = e.touches[0].clientY - startY;
   });
-
   joy.addEventListener("touchend", () => {
     GameState.joystick.active = false;
     GameState.joystick.dx = 0;
     GameState.joystick.dy = 0;
   });
-
   const jumpBtn = document.createElement("button");
   jumpBtn.innerHTML = "JUMP";
   jumpBtn.style.cssText = `
@@ -1323,7 +1211,6 @@ function createMobileControls() {
     touch-action: none;
   `;
   document.body.appendChild(jumpBtn);
-
   jumpBtn.addEventListener("touchstart", (e) => {
     e.preventDefault();
     jump();
@@ -1337,7 +1224,6 @@ function createMobileControls() {
 function updateHealthUI() {
   const healthValue = document.getElementById("healthValue");
   const healthFill = document.getElementById("healthFill");
-
   if (healthValue) healthValue.innerText = Math.ceil(GameState.health);
   if (healthFill) healthFill.style.width = GameState.health + "%";
 
@@ -1357,27 +1243,22 @@ function updateStaminaUI() {
   const staminaFill = document.getElementById("staminaFill");
   if (staminaFill) staminaFill.style.width = GameState.stamina + "%";
 }
-
 function updateBatteryUI() {
   const torchIndicator = document.getElementById("torchIndicator");
   if (torchIndicator) {
     torchIndicator.innerText = GameState.torchOn ? "Torch: ON" : "Torch: OFF";
   }
 }
-
 function updateObjectiveUI() {
   const objectiveText = document.getElementById("objectiveText");
   if (objectiveText) objectiveText.innerText = GameState.currentObjective;
 }
-
 function updateInventoryUI() {
   const invKey = document.getElementById("inventoryKey");
   const invNotes = document.getElementById("inventoryNotes");
-
   if (invKey) {
     invKey.style.display = GameState.inventory.key ? "block" : "none";
   }
-
   if (invNotes) {
     invNotes.innerText = "Notes: " + GameState.inventory.notesCollected;
   }
@@ -1389,27 +1270,22 @@ function updateInventoryUI() {
 
 function showGameOver() {
   if (GameState.paused) return; // Prevent multiple calls
-  
   GameState.paused = true;
   GameState.jumpscareStarted = true;
   document.getElementById("gameUI").style.display = "none";
   document.getElementById("gameOver").style.display = "flex";
   if (document.exitPointerLock) document.exitPointerLock();
-  
   playSound("jumpscare");
   console.log("💀 GAME OVER! Granny caught you!");
 }
 
 function showVictory() {
   if (GameState.paused) return; // Prevent multiple calls
-  
   GameState.paused = true;
   document.getElementById("gameUI").style.display = "none";
   document.getElementById("victory").style.display = "flex";
   if (document.exitPointerLock) document.exitPointerLock();
-
   playSound("door_open");
-
   setTimeout(() => {
     playSound("jumpscare");
     alert("You escaped... but it follows you still...");
@@ -1420,14 +1296,12 @@ function damagePlayer(amount) {
   GameState.health = Math.max(0, GameState.health - amount);
   playSound("damage");
   updateHealthUI();
-  
   // ✅ FLASH EFFECT ON DAMAGE
   const gameUI = document.getElementById("gameUI");
   gameUI.style.filter = "brightness(0.7)";
   setTimeout(() => {
     gameUI.style.filter = "brightness(1)";
   }, 200);
-
   if (GameState.health <= 0) {
     showGameOver();
   }
@@ -1436,7 +1310,6 @@ function damagePlayer(amount) {
 function restartGame() {
   location.reload();
 }
-
 function backToMenu() {
   location.reload();
 }
@@ -1453,11 +1326,8 @@ function onResize() {
 
 function animate() {
   requestAnimationFrame(animate);
-
   if (!player || !renderer || !scene || !camera) return;
-
   const delta = Math.min(clock.getDelta(), 0.05);
-
   if (!GameState.paused) {
     updatePlayer(delta);
     updateGravity(delta);
@@ -1473,6 +1343,5 @@ function animate() {
       shadowFigure.visible = false;
     }
   }
-
   renderer.render(scene, camera);
 }
