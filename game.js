@@ -194,17 +194,9 @@ function loadGrannyTexture(callback) {
 
   loader.load(
     'textures/GrannyG1New.webp',
-
     function(texture) {
       grannyTexture = texture;
-      console.log("Granny texture loaded");
       callback();
-    },
-
-    undefined,
-
-    function(error) {
-      console.error("Failed to load Granny texture", error);
     }
   );
 }
