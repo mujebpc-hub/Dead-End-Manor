@@ -501,22 +501,36 @@ function createMansionInterior(mansionPos) {
 // ============================================
 
 function createTree(x, z) {
+
   const groundY = getTerrainHeight(x, z);
-  const trunk = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.6, 0.9, 7, 8),
-    new THREE.MeshStandardMaterial({ color: 0x6B4423 })
+
+  const loader = new THREE.TDSLoader();
+
+  loader.load(
+    "models/Tree1.3ds",
+
+    function(treeModel) {
+
+      treeModel.scale.set(0.15, 0.15, 0.15);
+
+      treeModel.position.set(
+        x,
+        groundY,
+        z
+      );
+
+      treeModel.traverse(function(child) {
+        if (child.isMesh) {
+          child.castShadow = true;
+          child.receiveShadow = true;
+        }
+      });
+
+      scene.add(treeModel);
+    }
   );
-  trunk.position.set(x, groundY + 3.5, z);
-  trunk.castShadow = true;
-  scene.add(trunk);
-  addCylinderCollider(x, z, 2.2);
-  const leaves = new THREE.Mesh(
-    new THREE.ConeGeometry(4.5, 9, 8),
-    new THREE.MeshStandardMaterial({ color: 0x228B22 })
-  );
-  leaves.position.set(x, groundY + 10, z);
-  leaves.castShadow = true;
-  scene.add(leaves);
+
+  addCylinderCollider(x, z, 3);
 }
 
 function createForest() {
