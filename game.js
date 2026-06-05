@@ -100,7 +100,7 @@ let grannyTexture = null;
 // ============================================
 
 function startGame() {
-  document.getElementById("home").style.display = "none";
+  document.getElementById("home").style.display = "images/pexels-marek-piwnicki-3907296-15057987.jpg";
   document.getElementById("loading").style.display = "flex";
 
   setTimeout(() => {
