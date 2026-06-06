@@ -292,8 +292,8 @@ function init() {
   updateObjectiveUI();
   updateInventoryUI();
 
-  console.log("INIT COMPLETE → GLB TEST START");
-createGLBTestTree();
+  function loadGameGLBModels() {
+}
   
   // ✅ SET INITIAL TORCH STATE
   if (torchLight) torchLight.intensity = 9;
