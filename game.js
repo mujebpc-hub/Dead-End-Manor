@@ -12,6 +12,7 @@ let fuelTank;
 let redDiamond;
 let greenDiamond;
 let yellowDiamond;
+let glbTree = null;
 
 let friends = [];
 
@@ -84,6 +85,17 @@ let shadowFigure = null;
 let keyMarker = null;
 let mansionMarker = null;
 let escapeMarker = null;
+let listenersAdded = false;
+let mobileControlsCreated = false;
+
+function getEl(id) {
+  return document.getElementById(id);
+}
+
+function showEl(id, display = "block") {
+  const el = getEl(id);
+  if (el) el.style.display = display;
+}
 
 var GLB = window.GLB || {
   // pura GLB manager code yahan
@@ -91,24 +103,25 @@ var GLB = window.GLB || {
 
 window.GLB = GLB;
 window.GLTFLoader = window.GLTFLoader || THREE.GLTFLoader;
+const GLTFLoader = window.GLTFLoader;
 
 /* ================= END SAFE GLB MANAGER SYSTEM ================= */
 
 function startGame() {
-  document.getElementById("home").style.display = "none";
-  document.getElementById("loading").style.display = "flex";
+  showEl("home", "none");
+  showEl("loading", "flex");
 
   setTimeout(() => {
-    document.getElementById("loading").style.display = "none";
-    document.getElementById("menu").style.display = "flex";
+    showEl("loading", "none");
+    showEl("menu", "flex");
   }, 1500);
 }
 
 function enterGame() {
-  document.getElementById("menu").style.display = "none";
-  document.getElementById("gameUI").style.display = "block";
-  document.getElementById("gameOver").style.display = "none";
-  document.getElementById("victory").style.display = "none";
+  showEl("menu", "none");
+  showEl("gameUI", "block");
+  showEl("gameOver", "none");
+  showEl("victory", "none");
 
   if (!gameStarted) {
     gameStarted = true;
@@ -117,13 +130,18 @@ function enterGame() {
     animate();
   }
 
+  if (audioContext && audioContext.state === "suspended") {
+    audioContext.resume();
+  }
+
   requestPointerControl();
 }
 
 // ✅ SOUND SYSTEM INIT
 function initAudioContext() {
-  if (!audioContext) {
-    audioContext = new (window.AudioContext || window.webkitAudioContext)();
+  const AudioCtor = window.AudioContext || window.webkitAudioContext;
+  if (!audioContext && AudioCtor) {
+    audioContext = new AudioCtor();
   }
 }
 
@@ -277,12 +295,15 @@ function init() {
   torchLight.target.position.set(0, 0, -1);
   torchOn = true; // ✅ TORCH STARTS ON
 
-  window.addEventListener("keydown", keyDown);
-  window.addEventListener("keyup", keyUp);
-  document.addEventListener("click", requestPointerControl);
-  document.addEventListener("mousemove", handleMouseLook);
-  document.addEventListener("pointerlockchange", handlePointerLockChange);
-  window.addEventListener("resize", onResize);
+  if (!listenersAdded) {
+    window.addEventListener("keydown", keyDown);
+    window.addEventListener("keyup", keyUp);
+    document.addEventListener("click", requestPointerControl);
+    document.addEventListener("mousemove", handleMouseLook);
+    document.addEventListener("pointerlockchange", handlePointerLockChange);
+    window.addEventListener("resize", onResize);
+    listenersAdded = true;
+  }
 
   setupMobileUiButtons();
   createMobileControls();
@@ -292,9 +313,6 @@ function init() {
   updateObjectiveUI();
   updateInventoryUI();
 
-  function loadGameGLBModels() {
-}
-  
   // ✅ SET INITIAL TORCH STATE
   if (torchLight) torchLight.intensity = 9;
 }
@@ -564,11 +582,7 @@ function createShadowFigure() {
   head.position.y = 7;
   shadowFigure.add(head);
 
-  shadowFigure.position.set(
-    Math.random() * 200 - 100,
-    getTerrainHeight(0, -200),
-    -200 + Math.random() * 100
-  );
+  shadowFigure.position.set(0, getTerrainHeight(0, -200), -200);
   shadowFigure.userData.visible = false;
   scene.add(shadowFigure);
 }
@@ -595,10 +609,12 @@ function createNotes() {
   ];
 
   for (let i = 0; i < 3; i++) {
+    const x = Math.random() * 200 - 100;
+    const z = Math.random() * 200 - 100;
     const notePos = new THREE.Vector3(
-      Math.random() * 200 - 100,
-      getTerrainHeight(Math.random() * 200 - 100, Math.random() * 200 - 100) + 1,
-      Math.random() * 200 - 100
+      x,
+      getTerrainHeight(x, z) + 1,
+      z
     );
 
     const noteGeometry = new THREE.BoxGeometry(1, 1.5, 0.1);
@@ -810,7 +826,8 @@ function updateDangerLevel(distance) {
 
 // ✅ DANGER UI APPLICATION
 function applyDangerUI(level) {
-  const gameUI = document.getElementById("gameUI");
+  const gameUI = getEl("gameUI");
+  if (!gameUI) return;
   
   gameUI.classList.remove("enemy-near", "danger-shake");
   
@@ -923,7 +940,8 @@ function updatePlayer(delta) {
 // ✅ INTERACTION CHECK - IMPROVED
 function checkInteractions() {
   const interactionRange = 5;
-  const interactionText = document.getElementById("interactionText");
+  const interactionText = getEl("interactionText");
+  if (!interactionText) return;
 
   let nearItem = false;
 
@@ -991,6 +1009,7 @@ function handleInteraction() {
   if (mansionDoor && inventory.key && !doorUnlocked) {
     if (player.position.distanceTo(mansionDoor.position) < interactionRange) {
       doorUnlocked = true;
+      colliders = colliders.filter((col) => col.id !== mansionDoor.uuid);
       playSound("door_open");
       updateObjective(2);
       
@@ -1041,8 +1060,8 @@ function updateObjective(stage) {
 
 // ✅ UPDATE INVENTORY UI
 function updateInventoryUI() {
-  const invKey = document.getElementById("inventoryKey");
-  const invNotes = document.getElementById("inventoryNotes");
+  const invKey = getEl("inventoryKey");
+  const invNotes = getEl("inventoryNotes");
 
   if (invKey) {
     invKey.style.display = inventory.key ? "block" : "none";
@@ -1110,6 +1129,7 @@ function addBoxCollider(mesh) {
   box.getSize(size);
   box.getCenter(center);
   colliders.push({
+    id: mesh.uuid,
     x: center.x,
     z: center.z,
     r: Math.max(size.x, size.z) * 0.5
@@ -1155,7 +1175,7 @@ function handlePointerLockChange() {
 }
 
 function setupMobileUiButtons() {
-  const runBtn = document.getElementById("runBtn");
+  const runBtn = getEl("runBtn");
 
   if (runBtn) {
     runBtn.addEventListener("touchstart", (e) => {
@@ -1173,6 +1193,9 @@ function setupMobileUiButtons() {
 }
 
 function createMobileControls() {
+  if (mobileControlsCreated) return;
+  mobileControlsCreated = true;
+
   const joy = document.createElement("div");
   joy.style.cssText = `
     position: absolute;
@@ -1267,7 +1290,7 @@ function keyUp(e) {
 function togglePause() {
   paused = !paused;
 
-  const pauseBtn = document.getElementById("pauseBtn");
+  const pauseBtn = getEl("pauseBtn");
   if (pauseBtn) pauseBtn.innerHTML = paused ? "Play" : "Pause";
 
   if (paused && document.exitPointerLock) {
@@ -1282,33 +1305,35 @@ function toggleTorch() {
   torchOn = !torchOn;
   if (torchLight) torchLight.intensity = torchOn ? 9 : 0;
 
-  const torchBtn = document.getElementById("torchBtn");
+  const torchBtn = getEl("torchBtn");
   if (torchBtn) torchBtn.innerHTML = torchOn ? "Torch ON" : "Torch OFF";
 }
 
 function updateHealthUI() {
-  const healthValue = document.getElementById("healthValue");
-  const healthFill = document.getElementById("healthFill");
+  const healthValue = getEl("healthValue");
+  const healthFill = getEl("healthFill");
 
   if (healthValue) healthValue.innerText = Math.ceil(health);
   if (healthFill) healthFill.style.width = health + "%";
 
   if (health < 30) {
-    document.getElementById("gameUI").classList.add("low-health");
+    const gameUI = getEl("gameUI");
+    if (gameUI) gameUI.classList.add("low-health");
   } else {
-    document.getElementById("gameUI").classList.remove("low-health");
+    const gameUI = getEl("gameUI");
+    if (gameUI) gameUI.classList.remove("low-health");
   }
 }
 
 // ✅ STAMINA UI
 function updateStaminaUI() {
-  const staminaFill = document.getElementById("staminaFill");
+  const staminaFill = getEl("staminaFill");
   if (staminaFill) staminaFill.style.width = stamina + "%";
 }
 
 // ✅ BATTERY UI - NO DRAIN (unlimited torch)
 function updateBatteryUI() {
-  const torchIndicator = document.getElementById("torchIndicator");
+  const torchIndicator = getEl("torchIndicator");
   if (torchIndicator) {
     torchIndicator.innerText = torchOn ? "Torch: ON (∞)" : "Torch: OFF (∞)";
   }
@@ -1316,7 +1341,7 @@ function updateBatteryUI() {
 
 // ✅ OBJECTIVE UI
 function updateObjectiveUI() {
-  const objectiveText = document.getElementById("objectiveText");
+  const objectiveText = getEl("objectiveText");
   if (objectiveText) objectiveText.innerText = currentObjective;
 }
 
@@ -1328,16 +1353,16 @@ function damagePlayer(amount) {
 
 function showGameOver() {
   paused = true;
-  document.getElementById("gameUI").style.display = "none";
-  document.getElementById("gameOver").style.display = "flex";
+  showEl("gameUI", "none");
+  showEl("gameOver", "flex");
   if (document.exitPointerLock) document.exitPointerLock();
 }
 
 // ✅ IMPROVED VICTORY SCREEN WITH CUTSCENE
 function showVictory() {
   paused = true;
-  document.getElementById("gameUI").style.display = "none";
-  document.getElementById("victory").style.display = "flex";
+  showEl("gameUI", "none");
+  showEl("victory", "flex");
   if (document.exitPointerLock) document.exitPointerLock();
 
   // ✅ PLAY VICTORY CUTSCENE
