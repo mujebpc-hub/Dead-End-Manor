@@ -358,15 +358,21 @@ function createTerrain() {
   scene.add(ground);
 
   const road = new THREE.Mesh(
-    new THREE.BoxGeometry(16, 0.25, 420),
-    new THREE.MeshStandardMaterial({ color: 0x343434 })
-  );
-  road.position.set(0, getTerrainHeight(0, -130) + 0.12, -130);
-  road.castShadow = true;
-  road.receiveShadow = true;
-  scene.add(road);
-}
+  new THREE.BoxGeometry(12, 0.15, 220),
+  new THREE.MeshStandardMaterial({ color: 0x343434 })
+);
 
+road.position.set(
+  0,
+  getTerrainHeight(0, -110) + 0.05,
+  -110
+);
+
+road.castShadow = true;
+road.receiveShadow = true;
+
+scene.add(road);
+  
 function createMansion() {
   const mansion = new THREE.Mesh(
     new THREE.BoxGeometry(70, 32, 60),
