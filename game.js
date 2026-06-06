@@ -14,6 +14,7 @@ let greenDiamond;
 let yellowDiamond;
 let glbTree = null;
 let granny;
+let enemyMixer = null;
 let friends = [];
 
 let caveGate;
@@ -105,6 +106,63 @@ var GLB = window.GLB || {
 window.GLB = GLB;
 window.GLTFLoader = window.GLTFLoader || THREE.GLTFLoader;
 const GLTFLoader = window.GLTFLoader;
+
+const MODEL_PATHS = {
+  granny: "models/granny_blooded_nightmare.glb",
+  tree: "models/psx_tree.glb"
+};
+
+const MODEL_SCALE = {
+  granny: 2,
+  tree: 3
+};
+
+let treeTemplate = null;
+let treeLoadingPromise = null;
+
+function createGLTFLoader() {
+  const Loader = window.GLTFLoader || THREE.GLTFLoader;
+  if (!Loader) {
+    throw new Error("GLTFLoader missing. Add GLTFLoader before this game script.");
+  }
+  return new Loader();
+}
+
+function loadGLB(path) {
+  return new Promise((resolve, reject) => {
+    createGLTFLoader().load(path, resolve, undefined, reject);
+  });
+}
+
+function enableModelShadows(root) {
+  root.traverse((child) => {
+    if (child.isMesh) {
+      child.castShadow = true;
+      child.receiveShadow = true;
+      if (child.material) child.material.needsUpdate = true;
+    }
+  });
+}
+
+function cloneModel(root) {
+  if (THREE.SkeletonUtils && THREE.SkeletonUtils.clone) {
+    return THREE.SkeletonUtils.clone(root);
+  }
+  return root.clone(true);
+}
+
+function loadTreeTemplate() {
+  if (treeLoadingPromise) return treeLoadingPromise;
+
+  treeLoadingPromise = loadGLB(MODEL_PATHS.tree).then((gltf) => {
+    treeTemplate = gltf.scene;
+    enableModelShadows(treeTemplate);
+    console.log("TREE MODEL LOADED", MODEL_PATHS.tree);
+    return treeTemplate;
+  });
+
+  return treeLoadingPromise;
+}
 
 /* ================= END SAFE GLB MANAGER SYSTEM ================= */
 
@@ -464,23 +522,21 @@ function createMansionInterior(mansionPos) {
 function createTree(x, z) {
   const groundY = getTerrainHeight(x, z);
 
-  const trunk = new THREE.Mesh(
-  const grass = loader.load("models/psx_tree.glb");
-  
-  trunk.position.set(x, groundY + 5.5, z);
-  trunk.castShadow = true;
-  scene.add(trunk);
-  addCylinderCollider(x, z, 2.2);
+  if (!treeTemplate) return;
 
-  const leaves = new THREE.Mesh(
-   const tree = loader.load("models/psx_tree.glb")
-  );
-  leaves.position.set(x, groundY + 10, z);
-  leaves.castShadow = true;
-  scene.add(leaves);
+  const tree = cloneModel(treeTemplate);
+  tree.scale.setScalar(MODEL_SCALE.tree * (0.85 + Math.random() * 0.3));
+  tree.position.set(x, groundY, z);
+  tree.rotation.y = Math.random() * Math.PI * 2;
+  enableModelShadows(tree);
+
+  scene.add(tree);
+  addCylinderCollider(x, z, 2.8);
 }
 
 function createForest() {
+  const treePositions = [];
+
   for (let i = 0; i < 360; i++) {
     const x = Math.random() * WORLD_WIDTH - WORLD_WIDTH / 2;
     const z = Math.random() * WORLD_DEPTH - WORLD_DEPTH / 2;
@@ -488,20 +544,28 @@ function createForest() {
     if (Math.abs(x) < 85 && z > -500 && z < -340) continue;
     if (Math.abs(x) < 25 && z > -360 && z < 120) continue;
 
-    createTree(x, z);
+    treePositions.push({ x, z });
   }
+
+  loadTreeTemplate()
+    .then(() => {
+      treePositions.forEach(({ x, z }) => createTree(x, z));
+    })
+    .catch((error) => {
+      console.error("TREE MODEL ERROR", MODEL_PATHS.tree, error);
+    });
 }
 
 function createGLBTestTree() {
 
   console.log("TRYING TO LOAD GLB: models/psx_tree.glb");
   
- const loader = new GLTFLoader();
+ const loader = createGLTFLoader();
 
   console.log("GLB loading started...");
 
   loader.load(
-    "models/psx_tree.glb",
+    MODEL_PATHS.tree,
 
     function (gltf) {
       glbTree = gltf.scene;
@@ -630,24 +694,36 @@ function createNotes() {
 
 function createGranny() {
 
-  const loader = new THREE.GLTFLoader();
+  const loader = createGLTFLoader();
 
   loader.load(
-    "models/granny_blooded_nightmare.glb",
+    MODEL_PATHS.granny,
 
     function (gltf) {
 
       granny = gltf.scene;
+      enemy = granny;
 
-      granny.scale.set(2, 2, 2);
+      granny.scale.setScalar(MODEL_SCALE.granny);
 
       const x = 80;
       const z = -250;
       const y = getTerrainHeight(x, z);
 
       granny.position.set(x, y, z);
+      granny.userData.lastKnownPlayerPos = new THREE.Vector3();
+
+      enableModelShadows(granny);
+
+      if (gltf.animations && gltf.animations.length > 0) {
+        enemyMixer = new THREE.AnimationMixer(granny);
+        gltf.animations.forEach((clip) => {
+          enemyMixer.clipAction(clip).play();
+        });
+      }
 
       scene.add(granny);
+      pickEnemyPatrolTarget();
 
       console.log("GRANNY LOADED ✅");
 
@@ -662,6 +738,8 @@ function createGranny() {
 }
 
 function detectPlayer() {
+  if (!enemy || !player) return false;
+
   const distance = enemy.position.distanceTo(player.position);
   
   // ✅ CLOSE DETECTION
@@ -1393,6 +1471,8 @@ function animate() {
   const delta = Math.min(clock.getDelta(), 0.05);
 
   if (!paused) {
+    if (enemyMixer) enemyMixer.update(delta);
+
     updatePlayer(delta);
     updateGravity(delta);
     updateEnemyAI(delta);
@@ -1416,7 +1496,7 @@ function createBrokenCar() {
 
     console.log("createBrokenCar called");
 
-    const loader = new THREE.GLTFLoader();
+    const loader = createGLTFLoader();
 
     loader.load(
         "models/old_rusty_car.glb",
