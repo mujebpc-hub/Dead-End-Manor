@@ -7,6 +7,15 @@ let running = false;
 let health = 100;
 let stamina = 100;
 let battery = 1000;
+let brokenCar;
+let fuelTank;
+let redDiamond;
+let greenDiamond;
+let yellowDiamond;
+
+let friends = [];
+
+let caveGate;
 
 const WORLD_WIDTH = 1500;
 const WORLD_DEPTH = 1800;
