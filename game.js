@@ -13,7 +13,7 @@ let redDiamond;
 let greenDiamond;
 let yellowDiamond;
 let glbTree = null;
-
+let granny;
 let friends = [];
 
 let caveGate;
@@ -34,6 +34,7 @@ let lastSafePosition = new THREE.Vector3();
 
 let move = { w: false, a: false, s: false, d: false };
 let joystick = { active: false, dx: 0, dy: 0 };
+let sit = { c: false, dx: 0, dy: 0};
 
 let colliders = [];
 let enemyState = "patrol";
