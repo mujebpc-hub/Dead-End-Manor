@@ -470,7 +470,7 @@ function createGLBTestTree() {
 
   console.log("TRYING TO LOAD GLB: models/psx_tree.glb");
   
-  const loader = new THREE.GLTFLoader();
+ const loader = new GLTFLoader();
 
   console.log("GLB loading started...");
 
