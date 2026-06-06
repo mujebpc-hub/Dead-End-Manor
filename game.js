@@ -467,6 +467,9 @@ function createForest() {
 }
 
 function createGLBTestTree() {
+
+  console.log("TRYING TO LOAD GLB: models/psx_tree.glb");
+  
   const loader = new THREE.GLTFLoader();
 
   console.log("GLB loading started...");
