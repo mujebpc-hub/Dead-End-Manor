@@ -466,6 +466,8 @@ function createForest() {
 function createGLBTestTree() {
   const loader = new THREE.GLTFLoader();
 
+  console.log("GLB loading started...");
+
   loader.load(
     "models/psx_tree.glb",
 
@@ -475,7 +477,7 @@ function createGLBTestTree() {
       glbTree.scale.set(2, 2, 2);
 
       const x = 0;
-      const z = -100;
+      const z = 0;
       const y = getTerrainHeight(x, z);
 
       glbTree.position.set(x, y, z);
@@ -486,6 +488,8 @@ function createGLBTestTree() {
           child.receiveShadow = true;
         }
       });
+
+      console.log("GLB before adding to scene");
 
       scene.add(glbTree);
 
