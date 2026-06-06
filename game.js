@@ -1328,6 +1328,8 @@ function animate() {
 
 function createBrokenCar() {
 
+    console.log("createBrokenCar called");
+
     const loader = new THREE.GLTFLoader();
 
     loader.load(
