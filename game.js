@@ -630,40 +630,37 @@ function createNotes() {
   }
 }
 
-function createEnemy() {
-  enemy = new THREE.Group();
+function createGranny() {
 
-  const body = new THREE.Mesh(
-    new THREE.CylinderGeometry(1.5, 2.2, 8, 12),
-    new THREE.MeshStandardMaterial({
-      color: 0xd8d8d8,
-      transparent: true,
-      opacity: 0.78
-    })
+  const loader = new THREE.GLTFLoader();
+
+  loader.load(
+    "models/granny_blooded_nightmare.glb",
+
+    function (gltf) {
+
+      granny = gltf.scene;
+
+      granny.scale.set(2, 2, 2);
+
+      const x = 80;
+      const z = -250;
+      const y = getTerrainHeight(x, z);
+
+      granny.position.set(x, y, z);
+
+      scene.add(granny);
+
+      console.log("GRANNY LOADED ✅");
+
+    },
+
+    undefined,
+
+    function (error) {
+      console.error("GRANNY ERROR ❌", error);
+    }
   );
-  body.position.y = 4;
-  enemy.add(body);
-
-  const head = new THREE.Mesh(
-    new THREE.SphereGeometry(1.55, 16, 16),
-    new THREE.MeshStandardMaterial({ color: 0xf0f0f0 })
-  );
-  head.position.y = 9;
-  enemy.add(head);
-
-  const eyeMat = new THREE.MeshBasicMaterial({ color: 0xff1111 });
-  const eye1 = new THREE.Mesh(new THREE.SphereGeometry(0.18, 8, 8), eyeMat);
-  const eye2 = eye1.clone();
-  eye1.position.set(-0.45, 9.2, -1.25);
-  eye2.position.set(0.45, 9.2, -1.25);
-  enemy.add(eye1, eye2);
-
-  enemy.position.set(90, getTerrainHeight(90, -250), -250);
-  enemy.userData.speed = 5;
-  enemy.userData.lastKnownPlayerPos = new THREE.Vector3();
-  enemy.userData.canSeePlayer = false;
-  scene.add(enemy);
-  pickEnemyPatrolTarget();
 }
 
 function detectPlayer() {
