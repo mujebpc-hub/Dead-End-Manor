@@ -1328,19 +1328,34 @@ function animate() {
 
 function createBrokenCar() {
 
-    brokenCar = new THREE.Mesh(
-        new THREE.BoxGeometry(4, 1.5, 2),
-        new THREE.MeshStandardMaterial({
-            color: 0x333333
-        })
+    const loader = new THREE.GLTFLoader();
+
+    loader.load(
+        "models/old_rusty_car.glb",
+
+        function (gltf) {
+
+            brokenCar = gltf.scene;
+
+            brokenCar.scale.set(1.5, 1.5, 1.5);
+
+            brokenCar.position.set(
+                0,
+                getTerrainHeight(0, -180),
+                -180
+            );
+
+            brokenCar.rotation.y = Math.PI;
+
+            scene.add(brokenCar);
+
+            console.log("Rusty Car Loaded");
+        },
+
+        undefined,
+
+        function (error) {
+            console.error("Car Error:", error);
+        }
     );
-
-    brokenCar.position.set(
-        0,
-        getTerrainHeight(0, -180) + 1,
-        -180
-    );
-
-    scene.add(brokenCar);
-
 }
