@@ -85,6 +85,15 @@ let keyMarker = null;
 let mansionMarker = null;
 let escapeMarker = null;
 
+var GLB = window.GLB || {
+  // pura GLB manager code yahan
+};
+
+window.GLB = GLB;
+window.GLTFLoader = window.GLTFLoader || THREE.GLTFLoader;
+
+/* ================= END SAFE GLB MANAGER SYSTEM ================= */
+
 function startGame() {
   document.getElementById("home").style.display = "none";
   document.getElementById("loading").style.display = "flex";
