@@ -1325,3 +1325,22 @@ function animate() {
 
   renderer.render(scene, camera);
 }
+
+function createBrokenCar() {
+
+    brokenCar = new THREE.Mesh(
+        new THREE.BoxGeometry(4, 1.5, 2),
+        new THREE.MeshStandardMaterial({
+            color: 0x333333
+        })
+    );
+
+    brokenCar.position.set(
+        0,
+        getTerrainHeight(0, -180) + 1,
+        -180
+    );
+
+    scene.add(brokenCar);
+
+}
