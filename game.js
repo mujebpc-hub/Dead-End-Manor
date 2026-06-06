@@ -463,6 +463,43 @@ function createForest() {
   }
 }
 
+function createGLBTestTree() {
+  const loader = new THREE.GLTFLoader();
+
+  loader.load(
+    "models/psx_tree.glb",
+
+    function (gltf) {
+      glbTree = gltf.scene;
+
+      glbTree.scale.set(2, 2, 2);
+
+      const x = 0;
+      const z = -100;
+      const y = getTerrainHeight(x, z);
+
+      glbTree.position.set(x, y, z);
+
+      glbTree.traverse((child) => {
+        if (child.isMesh) {
+          child.castShadow = true;
+          child.receiveShadow = true;
+        }
+      });
+
+      scene.add(glbTree);
+
+      console.log("GLB TREE LOADED ✅");
+    },
+
+    undefined,
+
+    function (error) {
+      console.error("GLB TREE ERROR ❌", error);
+    }
+  );
+}
+
 function createRocks() {
   for (let i = 0; i < 120; i++) {
     const x = Math.random() * WORLD_WIDTH - WORLD_WIDTH / 2;
