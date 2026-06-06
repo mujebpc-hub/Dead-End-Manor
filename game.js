@@ -346,7 +346,7 @@ function createWorld() {
   createMansion();
   createForest();
   createRocks();
-  createEnemy();
+  createGranny();
   createKey();
   createNotes();
   createShadowFigure();
@@ -465,17 +465,15 @@ function createTree(x, z) {
   const groundY = getTerrainHeight(x, z);
 
   const trunk = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.6, 0.9, 7, 8),
-    new THREE.MeshStandardMaterial({ color: 0x4a2b17 })
-  );
-  trunk.position.set(x, groundY + 3.5, z);
+  const grass = loader.load("models/psx_tree.glb");
+  
+  trunk.position.set(x, groundY + 5.5, z);
   trunk.castShadow = true;
   scene.add(trunk);
   addCylinderCollider(x, z, 2.2);
 
   const leaves = new THREE.Mesh(
-    new THREE.ConeGeometry(4.5, 9, 8),
-    new THREE.MeshStandardMaterial({ color: 0x0d3d1d })
+   const tree = loader.load("models/psx_tree.glb")
   );
   leaves.position.set(x, groundY + 10, z);
   leaves.castShadow = true;
