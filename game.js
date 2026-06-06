@@ -319,7 +319,8 @@ function createWorld() {
   createKey();
   createNotes();
   createShadowFigure();
-  createBrokenCar();
+
+  // createBrokenCar();  
 }
 
 function getTerrainHeight(x, z) {
