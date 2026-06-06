@@ -12,11 +12,21 @@
       box-sizing: border-box;
     }
 
+    html,
+    body {
+      width: 100%;
+      height: 100%;
+    }
+
     body {
       margin: 0;
       overflow: hidden;
       font-family: Arial, sans-serif;
       background: #000;
+    }
+
+    canvas {
+      display: block;
     }
 
     #home,
@@ -97,6 +107,34 @@
       text-shadow: 0 2px 4px #000;
     }
 
+    #gameUI.enemy-near::before,
+    #gameUI.low-health::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+    }
+
+    #gameUI.enemy-near::before {
+      border: 10px solid rgba(170, 0, 0, 0.35);
+    }
+
+    #gameUI.low-health::after {
+      background: radial-gradient(circle, transparent 45%, rgba(120, 0, 0, 0.35) 100%);
+    }
+
+    #gameUI.danger-shake {
+      animation: dangerShake 0.12s infinite;
+    }
+
+    @keyframes dangerShake {
+      0% { transform: translate(0, 0); }
+      25% { transform: translate(2px, -1px); }
+      50% { transform: translate(-1px, 2px); }
+      75% { transform: translate(1px, 1px); }
+      100% { transform: translate(0, 0); }
+    }
+
     #healthBox {
       position: absolute;
       top: 16px;
@@ -113,9 +151,14 @@
       background: rgba(255, 255, 255, 0.15);
     }
 
-    #healthFill {
+    #healthFill,
+    #staminaFill {
       width: 100%;
       height: 100%;
+      transition: width 0.15s linear;
+    }
+
+    #healthFill {
       background: #d00000;
     }
 
@@ -127,8 +170,6 @@
     }
 
     #staminaFill {
-      width: 100%;
-      height: 100%;
       background: #e0b000;
     }
 
@@ -137,9 +178,9 @@
       top: 18px;
       left: 50%;
       transform: translateX(-50%);
+      width: min(620px, 60%);
       font-size: 18px;
       text-align: center;
-      max-width: 60%;
     }
 
     #interactionText {
@@ -148,6 +189,7 @@
       left: 50%;
       transform: translateX(-50%);
       display: none;
+      width: min(520px, 90%);
       font-size: 18px;
       text-align: center;
     }
@@ -157,6 +199,21 @@
       top: 116px;
       left: 16px;
       font-size: 16px;
+    }
+
+    #inventoryBox {
+      position: absolute;
+      top: 146px;
+      left: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      font-size: 15px;
+    }
+
+    #inventoryKey {
+      display: none;
+      color: #ffd452;
     }
 
     #pauseBtn {
@@ -230,7 +287,8 @@
 
       #healthBox,
       #staminaBox,
-      #torchIndicator {
+      #torchIndicator,
+      #inventoryBox {
         font-size: 14px;
       }
 
@@ -242,8 +300,8 @@
 
       #objectiveText {
         top: 74px;
+        width: 88%;
         font-size: 14px;
-        max-width: 88%;
       }
 
       #pauseBtn {
@@ -269,11 +327,10 @@
 </head>
 
 <body>
-
   <div id="home">
     <h1>THE WATCHER</h1>
     <p>Survive the night. Find the mansion. Escape before The Watcher finds you.</p>
-    <button onclick="startGame()">START</button>
+    <button type="button" onclick="startGame()">START</button>
     <button type="button">SETTINGS</button>
     <button type="button">CREDITS</button>
   </div>
@@ -284,7 +341,7 @@
 
   <div id="menu">
     <h1>THE WATCHER</h1>
-    <button onclick="enterGame()">ENTER GAME</button>
+    <button type="button" onclick="enterGame()">ENTER GAME</button>
   </div>
 
   <div id="gameUI">
@@ -303,33 +360,108 @@
     </div>
 
     <div id="torchIndicator">Torch: OFF</div>
+
+    <div id="inventoryBox">
+      <div id="inventoryKey">Key: Mansion Key</div>
+      <div id="inventoryNotes">Notes: 0</div>
+    </div>
+
     <div id="objectiveText">Find the Mansion Key</div>
     <div id="interactionText">Press E</div>
 
-    <button id="pauseBtn" onclick="togglePause()">Pause</button>
+    <button id="pauseBtn" type="button" onclick="togglePause()">Pause</button>
 
     <div id="crosshair">+</div>
 
     <div id="mobileControls">
-      <button id="torchBtn" onclick="toggleTorch()">Torch</button>
-      <button id="runBtn">Run</button>
+      <button id="torchBtn" type="button" onclick="toggleTorch()">Torch</button>
+      <button id="runBtn" type="button">Run</button>
     </div>
   </div>
 
   <div id="gameOver">
     <h1>YOU DIED</h1>
-    <button onclick="restartGame()">RETRY</button>
-    <button onclick="backToMenu()">MAIN MENU</button>
+    <button type="button" onclick="restartGame()">RETRY</button>
+    <button type="button" onclick="backToMenu()">MAIN MENU</button>
   </div>
 
   <div id="victory">
     <h1>YOU ESCAPED</h1>
-    <button onclick="restartGame()">PLAY AGAIN</button>
+    <button type="button" onclick="restartGame()">PLAY AGAIN</button>
   </div>
 
-<script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/three@0.160.0/examples/js/loaders/GLTFLoader.js"></script>
-<script src="game.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
 
+  <script>
+    window.GLTFLoader = window.GLTFLoader || (window.THREE && window.THREE.GLTFLoader);
+
+    window.GLB = window.GLB || {
+      cache: new Map(),
+
+      load(path, onLoad, onError) {
+        if (!window.THREE || !window.GLTFLoader) {
+          const error = new Error("Three.js or GLTFLoader is not loaded.");
+          console.error(error);
+          if (onError) onError(error);
+          return;
+        }
+
+        if (this.cache.has(path)) {
+          const cached = this.cache.get(path).clone(true);
+          if (onLoad) onLoad(cached);
+          return;
+        }
+
+        const loader = new window.GLTFLoader();
+        loader.load(
+          path,
+          (gltf) => {
+            const model = gltf.scene;
+            this.cache.set(path, model);
+            if (onLoad) onLoad(model.clone(true), gltf);
+          },
+          undefined,
+          (error) => {
+            console.error("GLB load failed:", path, error);
+            if (onError) onError(error);
+          }
+        );
+      },
+
+      addToScene(path, scene, options = {}) {
+        this.load(path, (model) => {
+          const {
+            position = { x: 0, y: 0, z: 0 },
+            rotation = { x: 0, y: 0, z: 0 },
+            scale = 1,
+            castShadow = true,
+            receiveShadow = true
+          } = options;
+
+          model.position.set(position.x || 0, position.y || 0, position.z || 0);
+          model.rotation.set(rotation.x || 0, rotation.y || 0, rotation.z || 0);
+
+          if (typeof scale === "number") {
+            model.scale.set(scale, scale, scale);
+          } else {
+            model.scale.set(scale.x || 1, scale.y || 1, scale.z || 1);
+          }
+
+          model.traverse((child) => {
+            if (child.isMesh) {
+              child.castShadow = castShadow;
+              child.receiveShadow = receiveShadow;
+            }
+          });
+
+          scene.add(model);
+          if (options.onReady) options.onReady(model);
+        }, options.onError);
+      }
+    };
+  </script>
+
+  <script src="game.js"></script>
 </body>
 </html>
