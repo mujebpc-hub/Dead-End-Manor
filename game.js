@@ -372,6 +372,8 @@ road.castShadow = true;
 road.receiveShadow = true;
 
 scene.add(road);
+
+}
   
 function createMansion() {
   const mansion = new THREE.Mesh(
