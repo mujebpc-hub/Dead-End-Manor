@@ -49,6 +49,7 @@ let enemyState = "patrol";
 let enemyTarget = new THREE.Vector3();
 let enemyPauseTimer = 0;
 let jumpscareStarted = false;
+let lastEnemyHitTime = 0;
 
 // ✅ INVENTORY SYSTEM
 let inventory = {
@@ -118,20 +119,54 @@ window.GLTFLoader = window.GLTFLoader || THREE.GLTFLoader;
 const GLTFLoader = window.GLTFLoader;
 
 const MODEL_PATHS = {
-  granny: "models/granny_blooded_nightmare.glb",
+  playerHero: "models/main character friend 1.glb",
+  friend2: "models/friend 2.glb",
+  friend3: "models/friend 3.glb",
+  friend4: "models/gulli friend 4.glb",
+  friend5: "models/friend 5.glb",
+  granny: "models/granny enemy 1.glb",
+  ghostWolf: "models/ghost worlf.glb",
+  rodBoss: "models/enemy 3 rod advanced.glb",
+  rodVan: "models/enemy 3 rod van.glb",
+  mansion: "models/mantion.glb",
+  clockTower: "models/clock tower.glb",
+  road: "models/road.glb",
+  teaShop: "models/tea shop.glb",
+  jeep: "models/jeep.glb",
+  rustyCar: "models/old_rusty_car.glb",
   tree: "models/psx_tree.glb",
   oldHouse: "models/gulli_bulli_house.glb",
-  rustyCar: "models/old_rusty_car.glb",
   babaFriend: "models/baba_full_rig_charactar_gulli_bulli_wale_baba.glb",
   hero: "models/motu_patlu.glb",
-  jeep: "models/jeep.glb",
   iceEnemy: "models/ice_scream_rod_nightmare_blooded.glb"
 };
 
 const MODEL_SCALE = {
-  granny: 7,
+  granny: 1,
   tree: 3
 };
+
+const STORY_CHARACTER_HEIGHT = playerHeight;
+const STORY_INTERACTION_RANGE = 13;
+const STORY_LOCATIONS = {
+  highway: new THREE.Vector3(0, 0, 220),
+  jeepStart: new THREE.Vector3(0, 0, 150),
+  forestGate: new THREE.Vector3(0, 0, -160),
+  mansion: new THREE.Vector3(0, 0, -420),
+  rangerCamp: new THREE.Vector3(120, 0, -650),
+  teaShop: new THREE.Vector3(-55, 0, 35),
+  clockTower: new THREE.Vector3(-260, 0, -650),
+  bunker: new THREE.Vector3(270, 0, -720),
+  mine: new THREE.Vector3(330, 0, -280),
+  caveGate: new THREE.Vector3(0, 0, -820),
+  rescue: new THREE.Vector3(0, 0, -900)
+};
+
+let storyObjects = {};
+let storyEnemies = [];
+let storyInteractables = [];
+let storyTimers = [];
+let normalizedHeroHeight = STORY_CHARACTER_HEIGHT;
 
 let treeTemplate = null;
 let treeLoadingPromise = null;
@@ -165,6 +200,11 @@ function fitModelToHeight(model, targetHeight) {
   const size = new THREE.Vector3();
   box.getSize(size);
   if (size.y > 0) model.scale.multiplyScalar(targetHeight / size.y);
+}
+
+function normalizeCharacterHeight(model, targetHeight = normalizedHeroHeight) {
+  fitModelToHeight(model, targetHeight);
+  return model;
 }
 
 function fitModelToLength(model, targetLength) {
@@ -462,15 +502,608 @@ function createStars() {
   scene.add(stars);
 }
 
+const CutsceneManager = {
+  messageTimer: 0,
+  show(text, seconds = 4) {
+    const interactionText = getEl("interactionText");
+    if (interactionText) {
+      interactionText.style.display = "block";
+      interactionText.innerText = text;
+    } else {
+      console.log("CUTSCENE:", text);
+    }
+    clearTimeout(this.messageTimer);
+    this.messageTimer = setTimeout(() => {
+      if (interactionText) interactionText.style.display = "none";
+    }, seconds * 1000);
+  },
+  intro() {
+    this.show("10:30 PM - Five friends return from a picnic. GPS suggests a forest shortcut.", 6);
+    storyTimers.push(setTimeout(() => StoryManager.advanceTo(1), 6000));
+  }
+};
+
+const QuestManager = {
+  setObjective(text) {
+    currentObjective = text;
+    updateObjectiveUI();
+  },
+  stageText(stage) {
+    const labels = {
+      0: "Returning home after picnic.",
+      1: "GPS suggests a shortcut through the forest.",
+      2: "Jeep broke down. Find help in the old mansion.",
+      3: "Search Dead End Manor for repair parts.",
+      4: "Warning found. Collect battery, fuel can, and engine part.",
+      5: "Return to the jeep and repair it.",
+      6: "Drive deeper into the cursed forest.",
+      7: "Friend 2 and Friend 3 vanished. Search for them.",
+      8: "Fuel empty again. Search the area.",
+      9: "You are alone. Survive.",
+      10: "Find the Red, Green, and Yellow Diamonds.",
+      11: "Go to the Clock Tower and take the Red Diamond.",
+      12: "Find the Green Diamond in the forest bunker.",
+      13: "Find the Yellow Diamond near the ancient mine.",
+      14: "Place all diamonds at the cave gate.",
+      15: "Free your missing friends in the inner cave.",
+      16: "Take the crown. The Skeleton King awakens.",
+      17: "Escape to the jeep before the cave collapses.",
+      18: "Victory. Some curses never stay buried."
+    };
+    this.setObjective(labels[stage] || labels[0]);
+  }
+};
+
+const FriendManager = {
+  keys: ["friend2", "friend3", "friend4", "friend5"],
+  spawnAll(center = STORY_LOCATIONS.jeepStart) {
+    this.keys.forEach((key, index) => {
+      const x = center.x + (index - 1.5) * 5;
+      const z = center.z + 8 + (index % 2) * 5;
+      loadStoryModel(key, {
+        x,
+        z,
+        rotY: Math.PI,
+        character: true,
+        onLoad: (model, gltf) => {
+          friends[index] = model;
+          storyObjects[key] = model;
+          if (gltf.animations && gltf.animations.length) {
+            const mixer = new THREE.AnimationMixer(model);
+            gltf.animations.forEach((clip) => mixer.clipAction(clip).play());
+            friendMixers.push(mixer);
+          }
+        }
+      });
+    });
+  },
+  disappear(keys) {
+    keys.forEach((key) => {
+      const model = storyObjects[key];
+      if (model && model.parent) model.parent.remove(model);
+      storyObjects[key] = null;
+    });
+    playSound("ghost_whisper");
+  },
+  respawnCaptured() {
+    this.keys.forEach((key, index) => {
+      loadStoryModel(key, {
+        x: STORY_LOCATIONS.rescue.x + (index - 1.5) * 4,
+        z: STORY_LOCATIONS.rescue.z + 8,
+        rotY: 0,
+        character: true,
+        onLoad: (model) => {
+          storyObjects[key] = model;
+          model.userData.captured = true;
+        }
+      });
+    });
+  },
+  followPlayer(delta) {
+    this.keys.forEach((key, index) => {
+      const friend = storyObjects[key];
+      if (!friend || friend.userData.captured) return;
+      const offset = new THREE.Vector3((index - 1.5) * 3, 0, 8 + index * 2).applyAxisAngle(new THREE.Vector3(0, 1, 0), yaw);
+      const target = player.position.clone().add(offset);
+      const dir = target.sub(friend.position);
+      dir.y = 0;
+      if (dir.length() > 3) {
+        dir.normalize();
+        friend.position.addScaledVector(dir, 7 * delta);
+        friend.position.y = getTerrainHeight(friend.position.x, friend.position.z);
+        friend.lookAt(player.position.x, friend.position.y, player.position.z);
+        avoidActorHardClip(friend, 2);
+      }
+    });
+  },
+  freeFriends() {
+    this.keys.forEach((key) => {
+      const friend = storyObjects[key];
+      if (friend) friend.userData.captured = false;
+    });
+    CutsceneManager.show("Your friends are alive. The crown glows on the altar.", 5);
+    StoryManager.advanceTo(16);
+  }
+};
+
+const VehicleManager = {
+  jeep: null,
+  state: "parked",
+  setup() {
+    loadStoryModel("road", { x: 0, z: -80, targetLength: 720, rotY: 0, colliderRadius: 0, onLoad: (model) => storyObjects.storyRoad = model });
+    loadStoryModel("teaShop", { x: STORY_LOCATIONS.teaShop.x, z: STORY_LOCATIONS.teaShop.z, rotY: Math.PI * 0.5, boxCollider: true, onLoad: (model) => storyObjects.teaShop = model });
+    loadStoryModel("jeep", {
+      x: STORY_LOCATIONS.jeepStart.x,
+      z: STORY_LOCATIONS.jeepStart.z,
+      rotY: Math.PI,
+      targetLength: 16,
+      colliderRadius: 7,
+      onLoad: (model) => {
+        this.jeep = model;
+        storyObjects.jeep = model;
+      }
+    });
+  },
+  enter() {
+    if (!this.jeep || this.state === "broken" || this.state === "empty") return;
+    playerInCar = true;
+    carSpeed = 0;
+    CutsceneManager.show("You are driving the jeep. Follow the road.", 3);
+  },
+  exit() {
+    playerInCar = false;
+    carSpeed = 0;
+    if (this.jeep) {
+      player.position.set(this.jeep.position.x + 7, getTerrainHeight(this.jeep.position.x + 7, this.jeep.position.z) + playerHeight, this.jeep.position.z);
+    }
+  },
+  breakDown(kind) {
+    playerInCar = false;
+    carSpeed = 0;
+    this.state = kind === "empty" ? "empty" : "broken";
+    playSound("tree_creak");
+  },
+  repair() {
+    this.state = "repaired";
+    CutsceneManager.show("Jeep repaired. Drive deeper into the forest.", 4);
+    StoryManager.advanceTo(6);
+  },
+  update(delta) {
+    if (!this.jeep || !playerInCar) return;
+
+    if (move.w || joystick.dy < -10) carSpeed = Math.min(carSpeed + 16 * delta, 26);
+    else if (move.s || joystick.dy > 10) carSpeed = Math.max(carSpeed - 18 * delta, -8);
+    else carSpeed *= 0.94;
+
+    const turn = (move.a ? 1 : 0) + (move.d ? -1 : 0) - THREE.MathUtils.clamp(joystick.dx / 80, -1, 1);
+    carYaw += turn * delta * 1.7;
+    const forward = new THREE.Vector3(0, 0, -1).applyAxisAngle(new THREE.Vector3(0, 1, 0), carYaw);
+    this.jeep.position.addScaledVector(forward, carSpeed * delta);
+    this.jeep.rotation.y = carYaw;
+    this.jeep.position.y = getTerrainHeight(this.jeep.position.x, this.jeep.position.z);
+    player.position.set(this.jeep.position.x, this.jeep.position.y + playerHeight, this.jeep.position.z);
+    yaw = carYaw;
+
+    if (StoryManager.stage === 1 && this.jeep.position.z < -60) StoryManager.advanceTo(2);
+    if (StoryManager.stage === 6 && this.jeep.position.z < -560) StoryManager.advanceTo(7);
+    if (StoryManager.stage === 7 && this.jeep.position.z < -700) StoryManager.advanceTo(8);
+    if (StoryManager.stage === 17 && this.jeep.position.z > -40) StoryManager.advanceTo(18);
+  }
+};
+
+const DiamondManager = {
+  collected: { red: false, green: false, yellow: false },
+  spawnDiamond(color, x, z) {
+    const colorHex = { red: 0xff2222, green: 0x22ff77, yellow: 0xffdd22 }[color];
+    const diamond = new THREE.Mesh(
+      new THREE.OctahedronGeometry(2.2, 0),
+      new THREE.MeshStandardMaterial({ color: colorHex, emissive: colorHex, emissiveIntensity: 0.35, metalness: 0.4 })
+    );
+    diamond.position.set(x, getTerrainHeight(x, z) + 3, z);
+    diamond.userData.type = "diamond";
+    diamond.userData.color = color;
+    diamond.castShadow = true;
+    scene.add(diamond);
+    storyInteractables.push(diamond);
+    storyObjects[color + "Diamond"] = diamond;
+  },
+  collect(color) {
+    this.collected[color] = true;
+    inventory[color + "Diamond"] = true;
+    const obj = storyObjects[color + "Diamond"];
+    if (obj && obj.parent) obj.parent.remove(obj);
+    playSound("key_pickup");
+    updateInventoryUI();
+    if (this.collected.red && this.collected.green && this.collected.yellow) StoryManager.advanceTo(14);
+    else if (color === "red") StoryManager.advanceTo(12);
+    else if (color === "green") StoryManager.advanceTo(13);
+  },
+  allCollected() {
+    return this.collected.red && this.collected.green && this.collected.yellow;
+  }
+};
+
+const BossManager = {
+  boss: null,
+  active: false,
+  spawn() {
+    loadStoryModel("rodBoss", {
+      x: STORY_LOCATIONS.rescue.x,
+      z: STORY_LOCATIONS.rescue.z - 26,
+      character: true,
+      height: STORY_CHARACTER_HEIGHT * 1.7,
+      onLoad: (model) => {
+        this.boss = model;
+        this.active = false;
+        storyObjects.boss = model;
+      }
+    });
+  },
+  awaken() {
+    this.active = true;
+    enemy = this.boss || enemy;
+    enemyState = "chase";
+    CutsceneManager.show("The Skeleton King awakens. Run!", 4);
+    StoryManager.advanceTo(17);
+  },
+  update(delta) {
+    if (!this.active || !this.boss || !player) return;
+    const dir = new THREE.Vector3().subVectors(player.position, this.boss.position);
+    dir.y = 0;
+    if (dir.length() > 1) {
+      dir.normalize();
+      this.boss.position.addScaledVector(dir, 13 * delta);
+      this.boss.position.y = getTerrainHeight(this.boss.position.x, this.boss.position.z);
+      this.boss.lookAt(player.position.x, this.boss.position.y, player.position.z);
+      avoidActorHardClip(this.boss, 3);
+    }
+    if (this.boss.position.distanceTo(player.position) < 5) damagePlayer(34 * delta);
+  }
+};
+
+const EndingManager = {
+  show() {
+    paused = true;
+    showEl("gameUI", "none");
+    showEl("victory", "flex");
+    playSound("door_open");
+    setTimeout(() => alert("Some curses never stay buried."), 700);
+  }
+};
+
+const StoryManager = {
+  stage: 0,
+  initialized: false,
+  setup() {
+    if (this.initialized) return;
+    this.initialized = true;
+    installMobileViewportFix();
+    VehicleManager.setup();
+    FriendManager.spawnAll(STORY_LOCATIONS.jeepStart);
+    loadStoryModel("mansion", { x: STORY_LOCATIONS.mansion.x, z: STORY_LOCATIONS.mansion.z, targetHeight: 45, boxCollider: true, onLoad: (model) => storyObjects.storyMansion = model });
+    loadStoryModel("clockTower", { x: STORY_LOCATIONS.clockTower.x, z: STORY_LOCATIONS.clockTower.z, targetHeight: 82, boxCollider: true, onLoad: (model) => storyObjects.clockTower = model });
+    createStoryItems();
+    createStoryLocations();
+    this.advanceTo(0);
+    CutsceneManager.intro();
+  },
+  advanceTo(nextStage) {
+    if (nextStage <= this.stage && nextStage !== 0) return;
+    this.stage = nextStage;
+    objectiveStage = nextStage;
+    QuestManager.stageText(nextStage);
+    this.applyStage(nextStage);
+  },
+  applyStage(stage) {
+    if (stage === 1) CutsceneManager.show("GPS: Shortcut available. Save 30 KM.", 5);
+    if (stage === 2) {
+      VehicleManager.breakDown("broken");
+      CutsceneManager.show("Engine failed. No signal. A mansion stands on the hill.", 5);
+    }
+    if (stage === 6) {
+      VehicleManager.state = "repaired";
+      if (scene.fog) scene.fog.density = 0.004;
+      spawnStoryEnemy("ghostWolf", STORY_LOCATIONS.rangerCamp.x, STORY_LOCATIONS.rangerCamp.z);
+    }
+    if (stage === 7) {
+      VehicleManager.breakDown("parked");
+      FriendManager.disappear(["friend2", "friend3"]);
+      CutsceneManager.show("Friend 2 and Friend 3 disappeared without a sound.", 5);
+    }
+    if (stage === 8) {
+      VehicleManager.breakDown("empty");
+      CutsceneManager.show("Fuel gauge hits empty. Search the area.", 4);
+      storyTimers.push(setTimeout(() => this.advanceTo(9), 8000));
+    }
+    if (stage === 9) {
+      FriendManager.disappear(["friend4", "friend5"]);
+      CutsceneManager.show("You return to silence. Everyone is gone.", 5);
+    }
+    if (stage === 10) CutsceneManager.show("Map found: Want your friends back? Find the Three Diamonds.", 6);
+    if (stage === 11) spawnStoryEnemy("ghostWolf", STORY_LOCATIONS.clockTower.x + 30, STORY_LOCATIONS.clockTower.z + 20);
+    if (stage === 12) spawnStoryEnemy("granny", STORY_LOCATIONS.bunker.x, STORY_LOCATIONS.bunker.z);
+    if (stage === 13) spawnStoryEnemy("rodVan", STORY_LOCATIONS.mine.x, STORY_LOCATIONS.mine.z);
+    if (stage === 14) CutsceneManager.show("All diamonds collected. Go to the cave gate.", 5);
+    if (stage === 15) {
+      FriendManager.respawnCaptured();
+      BossManager.spawn();
+    }
+    if (stage === 17) {
+      VehicleManager.state = "repaired";
+      CutsceneManager.show("Cave is collapsing. Reach the jeep and drive out.", 5);
+    }
+    if (stage === 18) EndingManager.show();
+  },
+  update(delta) {
+    rotateStoryPickups(delta);
+    FriendManager.followPlayer(delta);
+    VehicleManager.update(delta);
+    updateStoryEnemies(delta);
+    BossManager.update(delta);
+    autoAdvanceByLocation();
+  }
+};
+
+function createStoryWorld() {
+  StoryManager.setup();
+}
+
+function createStoryLocations() {
+  createMarker("Ranger Camp", STORY_LOCATIONS.rangerCamp.x, STORY_LOCATIONS.rangerCamp.z, 0x668866);
+  createMarker("Bunker", STORY_LOCATIONS.bunker.x, STORY_LOCATIONS.bunker.z, 0x44ff88);
+  createMarker("Ancient Mine", STORY_LOCATIONS.mine.x, STORY_LOCATIONS.mine.z, 0xffdd55);
+  caveGate = createMarker("Cave Gate", STORY_LOCATIONS.caveGate.x, STORY_LOCATIONS.caveGate.z, 0x33ff99);
+  caveGate.visible = false;
+}
+
+function createMarker(label, x, z, color) {
+  const marker = new THREE.Mesh(
+    new THREE.CylinderGeometry(5, 5, 1.2, 16),
+    new THREE.MeshStandardMaterial({ color, emissive: color, emissiveIntensity: 0.15 })
+  );
+  marker.position.set(x, getTerrainHeight(x, z) + 0.7, z);
+  marker.userData.label = label;
+  scene.add(marker);
+  return marker;
+}
+
+function createStoryItems() {
+  createStoryPickup("batteryPart", "Battery", -18, -416, 0x66ccff);
+  createStoryPickup("fuelCan", "Fuel Can", 16, -432, 0xff3333);
+  createStoryPickup("enginePart", "Engine Part", 32, -404, 0xb0b0b0);
+  createStoryPickup("warningNote", "Warning Note", -8, -392, 0xd4a574);
+  createStoryPickup("map", "Old Map", STORY_LOCATIONS.teaShop.x, STORY_LOCATIONS.teaShop.z + 8, 0xfff0a0);
+  DiamondManager.spawnDiamond("red", STORY_LOCATIONS.clockTower.x, STORY_LOCATIONS.clockTower.z - 18);
+  DiamondManager.spawnDiamond("green", STORY_LOCATIONS.bunker.x + 16, STORY_LOCATIONS.bunker.z);
+  DiamondManager.spawnDiamond("yellow", STORY_LOCATIONS.mine.x - 16, STORY_LOCATIONS.mine.z);
+  createStoryPickup("crown", "Crown", STORY_LOCATIONS.rescue.x, STORY_LOCATIONS.rescue.z - 8, 0xffd700);
+  storyObjects.redDiamond.visible = false;
+  storyObjects.greenDiamond.visible = false;
+  storyObjects.yellowDiamond.visible = false;
+  storyObjects.crown.visible = false;
+}
+
+function createStoryPickup(type, label, x, z, color) {
+  const item = new THREE.Mesh(
+    new THREE.BoxGeometry(2, 1.2, 2),
+    new THREE.MeshStandardMaterial({ color, emissive: color, emissiveIntensity: 0.12 })
+  );
+  item.position.set(x, getTerrainHeight(x, z) + 2, z);
+  item.userData.type = type;
+  item.userData.label = label;
+  item.castShadow = true;
+  scene.add(item);
+  storyInteractables.push(item);
+  storyObjects[type] = item;
+  return item;
+}
+
+function rotateStoryPickups(delta) {
+  storyInteractables.forEach((item) => {
+    if (!item || !item.visible) return;
+    item.rotation.y += delta * 1.8;
+    item.position.y = getTerrainHeight(item.position.x, item.position.z) + 2 + Math.sin(Date.now() * 0.003) * 0.25;
+  });
+}
+
+function spawnStoryEnemy(key, x, z) {
+  loadStoryModel(key, {
+    x,
+    z,
+    character: true,
+    height: key === "ghostWolf" ? STORY_CHARACTER_HEIGHT * 0.75 : STORY_CHARACTER_HEIGHT,
+    onLoad: (model, gltf) => {
+      model.userData.lastKnownPlayerPos = new THREE.Vector3();
+      model.userData.enemyKey = key;
+      model.userData.speed = key === "ghostWolf" ? 15 : 10;
+      storyEnemies.push(model);
+      enemy = model;
+      enemyState = "patrol";
+      if (gltf.animations && gltf.animations.length) {
+        enemyMixer = new THREE.AnimationMixer(model);
+        gltf.animations.forEach((clip) => enemyMixer.clipAction(clip).play());
+      }
+      pickEnemyPatrolTarget();
+    }
+  });
+}
+
+function updateStoryEnemies(delta) {
+  storyEnemies.forEach((actor) => {
+    if (!actor || !actor.parent || actor === enemy) return;
+    const dist = actor.position.distanceTo(player.position);
+    const dir = new THREE.Vector3().subVectors(player.position, actor.position);
+    dir.y = 0;
+    if (detectActorPlayer(actor, dist) && dir.length() > 0.01) {
+      dir.normalize();
+      actor.position.addScaledVector(dir, (actor.userData.speed || 9) * delta);
+      actor.lookAt(player.position.x, actor.position.y, player.position.z);
+      avoidActorHardClip(actor, 2.3);
+    }
+    actor.position.y = getTerrainHeight(actor.position.x, actor.position.z);
+    if (dist < 4) damagePlayer(28 * delta);
+  });
+}
+
+function detectActorPlayer(actor, distance) {
+  if (distance < 22) return true;
+  const toPlayer = new THREE.Vector3().subVectors(player.position, actor.position);
+  toPlayer.y = 0;
+  if (toPlayer.length() > 120) return false;
+  toPlayer.normalize();
+  const forward = new THREE.Vector3(0, 0, -1).applyQuaternion(actor.quaternion);
+  forward.y = 0;
+  forward.normalize();
+  if (forward.dot(toPlayer) > 0.25 && distance < 110) return true;
+  if (forward.dot(toPlayer) < -0.2 && distance < 18) return true;
+  return lastPlayerSound.type === "run" && distance < 65;
+}
+
+function avoidActorHardClip(actor, radius) {
+  for (const col of colliders) {
+    const dx = actor.position.x - col.x;
+    const dz = actor.position.z - col.z;
+    const distSq = dx * dx + dz * dz;
+    const minDist = radius + col.r;
+    if (distSq < minDist * minDist) {
+      const dist = Math.sqrt(distSq) || 0.01;
+      actor.position.x = col.x + (dx / dist) * minDist;
+      actor.position.z = col.z + (dz / dist) * minDist;
+    }
+  }
+}
+
+function autoAdvanceByLocation() {
+  if (!player) return;
+  const p = player.position;
+  if (StoryManager.stage === 2 && p.distanceTo(STORY_LOCATIONS.mansion) < 60) StoryManager.advanceTo(3);
+  if (StoryManager.stage === 3 && inventory.batteryPart && inventory.fuelCan && inventory.enginePart) StoryManager.advanceTo(5);
+  if (StoryManager.stage === 9 && storyObjects.map && p.distanceTo(storyObjects.map.position) < STORY_INTERACTION_RANGE) StoryManager.advanceTo(10);
+  if (StoryManager.stage === 10) {
+    storyObjects.redDiamond.visible = true;
+    StoryManager.advanceTo(11);
+  }
+  if (StoryManager.stage === 12) storyObjects.greenDiamond.visible = true;
+  if (StoryManager.stage === 13) storyObjects.yellowDiamond.visible = true;
+  if (StoryManager.stage === 14 && caveGate) caveGate.visible = true;
+  if (StoryManager.stage === 14 && p.distanceTo(STORY_LOCATIONS.caveGate) < 16) StoryManager.advanceTo(15);
+  if (StoryManager.stage === 15 && storyObjects.crown) storyObjects.crown.visible = true;
+}
+
+function checkStoryInteractionPrompt(interactionText) {
+  if (VehicleManager.jeep && player.position.distanceTo(VehicleManager.jeep.position) < STORY_INTERACTION_RANGE) {
+    interactionText.style.display = "block";
+    interactionText.innerText = StoryManager.stage === 5
+      ? "Press E to repair jeep"
+      : (playerInCar ? "Press E to leave jeep" : "Press E to sit in jeep");
+    return true;
+  }
+
+  for (const item of storyInteractables) {
+    if (!item || !item.visible || player.position.distanceTo(item.position) > STORY_INTERACTION_RANGE) continue;
+    interactionText.style.display = "block";
+    interactionText.innerText = "Press E: " + (item.userData.label || "Collect");
+    return true;
+  }
+
+  if (StoryManager.stage === 15 && player.position.distanceTo(STORY_LOCATIONS.rescue) < 18) {
+    interactionText.style.display = "block";
+    interactionText.innerText = "Press E to free your friends";
+    return true;
+  }
+
+  return false;
+}
+
+function handleStoryInteraction() {
+  if (StoryManager.stage === 5 && VehicleManager.jeep && player.position.distanceTo(VehicleManager.jeep.position) < STORY_INTERACTION_RANGE + 5) {
+    VehicleManager.repair();
+    return true;
+  }
+
+  if (VehicleManager.jeep && player.position.distanceTo(VehicleManager.jeep.position) < STORY_INTERACTION_RANGE) {
+    if (playerInCar) VehicleManager.exit();
+    else VehicleManager.enter();
+    return true;
+  }
+
+  if (StoryManager.stage === 15 && player.position.distanceTo(STORY_LOCATIONS.rescue) < 18) {
+    FriendManager.freeFriends();
+    return true;
+  }
+
+  for (const item of storyInteractables) {
+    if (!item || !item.visible || player.position.distanceTo(item.position) > STORY_INTERACTION_RANGE) continue;
+    const type = item.userData.type;
+    if (type === "diamond") {
+      DiamondManager.collect(item.userData.color);
+      return true;
+    }
+    if (type === "warningNote") {
+      inventory.notes.push("Do not enter the forest. Something is watching you.");
+      item.visible = false;
+      CutsceneManager.show("Do not enter the forest. Something is watching you.", 5);
+      StoryManager.advanceTo(4);
+      return true;
+    }
+    if (type === "map") {
+      item.visible = false;
+      StoryManager.advanceTo(10);
+      return true;
+    }
+    if (type === "crown") {
+      item.visible = false;
+      BossManager.awaken();
+      return true;
+    }
+    inventory[type] = true;
+    item.visible = false;
+    playSound("key_pickup");
+    updateInventoryUI();
+    if (inventory.batteryPart && inventory.fuelCan && inventory.enginePart) StoryManager.advanceTo(5);
+    return true;
+  }
+
+  return false;
+}
+
+function installMobileViewportFix() {
+  let meta = document.querySelector("meta[name='viewport']");
+  if (!meta) {
+    meta = document.createElement("meta");
+    meta.name = "viewport";
+    document.head.appendChild(meta);
+  }
+  meta.content = "width=device-width, initial-scale=1, maximum-scale=1, minimum-scale=1, user-scalable=no, viewport-fit=cover";
+
+  document.documentElement.style.touchAction = "none";
+  document.documentElement.style.overscrollBehavior = "none";
+  document.body.style.touchAction = "none";
+  document.body.style.overscrollBehavior = "none";
+  document.body.style.userSelect = "none";
+  document.body.style.webkitUserSelect = "none";
+
+  let lastTouchEnd = 0;
+  document.addEventListener("touchend", (event) => {
+    const now = Date.now();
+    if (now - lastTouchEnd <= 350) event.preventDefault();
+    lastTouchEnd = now;
+  }, { passive: false });
+  document.addEventListener("gesturestart", (event) => event.preventDefault(), { passive: false });
+  document.addEventListener("gesturechange", (event) => event.preventDefault(), { passive: false });
+  document.addEventListener("gestureend", (event) => event.preventDefault(), { passive: false });
+}
+
 function createWorld() {
   createTerrain();
   createMansion();
   createForest();
   createRocks();
-  createGranny();
+  if (window.ENABLE_SANDBOX_GRANNY) createGranny();
   createKey();
   createNotes();
   createShadowFigure();
+  createStoryWorld();
 
   // createBrokenCar();  
 }
@@ -767,7 +1400,7 @@ function createGranny() {
       granny = gltf.scene;
       enemy = granny;
 
-      granny.scale.setScalar(MODEL_SCALE.granny);
+      normalizeCharacterHeight(granny);
 
       const x = 80;
       const z = -250;
@@ -805,20 +1438,22 @@ function detectPlayer() {
 
   const distance = enemy.position.distanceTo(player.position);
   
-  // ✅ CLOSE DETECTION
-  if (distance < 50) return true;
+  // ✅ CLOSE DETECTION: back-side sense is short, front vision is long.
+  if (distance < 18) return true;
 
   // ✅ VISION CONE - IMPROVED
   const toPlayer = new THREE.Vector3().subVectors(player.position, enemy.position);
   toPlayer.y = 0;
 
-  if (toPlayer.length() < 100) {
+  if (toPlayer.length() < 130) {
     toPlayer.normalize();
     const enemyForward = new THREE.Vector3(0, 0, -1).applyQuaternion(enemy.quaternion);
     enemyForward.y = 0;
     enemyForward.normalize();
 
-    if (enemyForward.dot(toPlayer) > 0.4) return true;
+    const facingDot = enemyForward.dot(toPlayer);
+    if (facingDot > 0.25) return true;
+    if (facingDot < -0.2 && distance < 22) return true;
   }
 
   // ✅ SOUND DETECTION - IMPROVED
@@ -835,9 +1470,18 @@ function updateEnemyAI(delta) {
 
   const distance = enemy.position.distanceTo(player.position);
 
-  // ✅ KILL CHECK
+  // ✅ DAMAGE CHECK - 2/3 hits should end the player, but health UI gets a fair chance.
   if (distance < 3) {
-    triggerJumpscare();
+    const now = Date.now();
+    if (now - lastEnemyHitTime > 900) {
+      lastEnemyHitTime = now;
+      damagePlayer(38);
+      if (health <= 0) triggerJumpscare();
+      else {
+        enemyState = "investigate";
+        enemy.userData.lastKnownPlayerPos.copy(player.position);
+      }
+    }
     return;
   }
 
@@ -1020,6 +1664,11 @@ function updatePlayer(delta) {
 
   lastSafePosition.copy(player.position);
 
+  if (playerInCar) {
+    checkInteractions();
+    return;
+  }
+
   const currentSpeed = running ? runSpeed : walkSpeed;
   const forward = new THREE.Vector3(0, 0, -1).applyAxisAngle(
     new THREE.Vector3(0, 1, 0),
@@ -1082,6 +1731,10 @@ function checkInteractions() {
 
   let nearItem = false;
 
+  if (checkStoryInteractionPrompt(interactionText)) {
+    return;
+  }
+
   // ✅ CHECK KEY
   if (keyPickup && !inventory.key) {
     const keyDist = player.position.distanceTo(keyPickup.position);
@@ -1129,6 +1782,8 @@ function checkInteractions() {
 // ✅ INTERACTION HANDLER - IMPROVED
 function handleInteraction() {
   const interactionRange = 5;
+
+  if (handleStoryInteraction()) return;
 
   // ✅ PICK UP KEY
   if (keyPickup && !inventory.key) {
@@ -1205,7 +1860,8 @@ function updateInventoryUI() {
   }
 
   if (invNotes) {
-    invNotes.innerText = "Notes: " + inventory.notesCollected;
+    const diamonds = ["redDiamond", "greenDiamond", "yellowDiamond"].filter((key) => inventory[key]).length;
+    invNotes.innerText = "Notes: " + inventory.notesCollected + " | Diamonds: " + diamonds + "/3";
   }
 }
 
@@ -1535,11 +2191,13 @@ function animate() {
 
   if (!paused) {
     if (enemyMixer) enemyMixer.update(delta);
+    friendMixers.forEach((mixer) => mixer.update(delta));
 
     updatePlayer(delta);
     updateGravity(delta);
     updateEnemyAI(delta);
     updateHorrorEvents(delta);
+    StoryManager.update(delta);
     handleCollisions();
     updateStaminaUI();
     updateBatteryUI();
@@ -1589,4 +2247,84 @@ function createBrokenCar() {
             console.error("Car Error:", error);
         }
     );
+}
+
+function loadStoryModel(key, options = {}) {
+  const path = MODEL_PATHS[key];
+  if (!path) return Promise.resolve(null);
+
+  return loadGLB(path)
+    .then((gltf) => {
+      const model = gltf.scene;
+      enableModelShadows(model);
+
+      if (options.character) normalizeCharacterHeight(model, options.height || normalizedHeroHeight);
+      if (options.targetHeight) fitModelToHeight(model, options.targetHeight);
+      if (options.targetLength) fitModelToLength(model, options.targetLength);
+
+      snapModelToGround(model, options.x || 0, options.z || 0, options.rotY || 0);
+      model.userData.storyKey = key;
+      scene.add(model);
+
+      if (options.colliderRadius) addCylinderCollider(model.position.x, model.position.z, options.colliderRadius);
+      if (options.boxCollider) addBoxCollider(model);
+      if (options.onLoad) options.onLoad(model, gltf);
+      return model;
+    })
+    .catch((error) => {
+      console.warn("STORY MODEL FALLBACK:", key, path, error);
+      const fallback = createFallbackStoryModel(key, options);
+      if (fallback) scene.add(fallback);
+      return fallback;
+    });
+}
+
+function createFallbackStoryModel(key, options = {}) {
+  const group = new THREE.Group();
+  const colorMap = {
+    jeep: 0x26384f,
+    road: 0x242424,
+    teaShop: 0x7b5b34,
+    mansion: 0x8f8f8f,
+    clockTower: 0x808080,
+    ghostWolf: 0x79d8ff,
+    granny: 0x332222,
+    rodVan: 0x43333a,
+    rodBoss: 0x7b1111
+  };
+  const color = colorMap[key] || 0xcccccc;
+  const material = new THREE.MeshStandardMaterial({ color, roughness: 0.85 });
+  let mesh;
+
+  if (options.character) {
+    const characterGeometry = THREE.CapsuleGeometry
+      ? new THREE.CapsuleGeometry(1, STORY_CHARACTER_HEIGHT * 0.42, 6, 12)
+      : new THREE.CylinderGeometry(1, 1, STORY_CHARACTER_HEIGHT, 12);
+    mesh = new THREE.Mesh(characterGeometry, material);
+    mesh.position.y = STORY_CHARACTER_HEIGHT * 0.5;
+  } else if (key === "road") {
+    mesh = new THREE.Mesh(new THREE.BoxGeometry(16, 0.2, 650), material);
+  } else if (key === "mansion") {
+    mesh = new THREE.Mesh(new THREE.BoxGeometry(82, 36, 68), material);
+    mesh.position.y = 18;
+  } else if (key === "clockTower") {
+    mesh = new THREE.Mesh(new THREE.BoxGeometry(24, 70, 24), material);
+    mesh.position.y = 35;
+  } else if (key === "teaShop") {
+    mesh = new THREE.Mesh(new THREE.BoxGeometry(22, 12, 18), material);
+    mesh.position.y = 6;
+  } else {
+    mesh = new THREE.Mesh(new THREE.BoxGeometry(8, 5, 14), material);
+    mesh.position.y = 2.5;
+  }
+
+  mesh.castShadow = true;
+  mesh.receiveShadow = true;
+  group.add(mesh);
+  snapModelToGround(group, options.x || 0, options.z || 0, options.rotY || 0);
+  group.userData.storyKey = key;
+  if (options.colliderRadius) addCylinderCollider(group.position.x, group.position.z, options.colliderRadius);
+  if (options.boxCollider) addBoxCollider(mesh);
+  if (options.onLoad) options.onLoad(group, { animations: [] });
+  return group;
 }
