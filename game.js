@@ -129,7 +129,7 @@ const MODEL_PATHS = {
 };
 
 const MODEL_SCALE = {
-  granny: 1,
+  granny: 3,
   tree: 3
 };
 
