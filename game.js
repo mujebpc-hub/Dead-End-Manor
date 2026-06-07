@@ -165,8 +165,10 @@ const STORY_LOCATIONS = {
 let storyObjects = {};
 let storyEnemies = [];
 let storyInteractables = [];
+let storyBeacons = [];
 let storyTimers = [];
 let normalizedHeroHeight = STORY_CHARACTER_HEIGHT;
+let currentStoryTarget = null;
 
 let treeTemplate = null;
 let treeLoadingPromise = null;
@@ -528,6 +530,9 @@ const QuestManager = {
     currentObjective = text;
     updateObjectiveUI();
   },
+  setTarget(vec) {
+    currentStoryTarget = vec ? vec.clone() : null;
+  },
   stageText(stage) {
     const labels = {
       0: "Returning home after picnic.",
@@ -550,6 +555,27 @@ const QuestManager = {
       17: "Escape to the jeep before the cave collapses.",
       18: "Victory. Some curses never stay buried."
     };
+    const targets = {
+      0: STORY_LOCATIONS.jeepStart,
+      1: STORY_LOCATIONS.jeepStart,
+      2: STORY_LOCATIONS.mansion,
+      3: STORY_LOCATIONS.mansion,
+      4: STORY_LOCATIONS.mansion,
+      5: STORY_LOCATIONS.jeepStart,
+      6: STORY_LOCATIONS.rangerCamp,
+      7: STORY_LOCATIONS.rangerCamp,
+      8: STORY_LOCATIONS.teaShop,
+      9: STORY_LOCATIONS.teaShop,
+      10: STORY_LOCATIONS.clockTower,
+      11: STORY_LOCATIONS.clockTower,
+      12: STORY_LOCATIONS.bunker,
+      13: STORY_LOCATIONS.mine,
+      14: STORY_LOCATIONS.caveGate,
+      15: STORY_LOCATIONS.rescue,
+      16: STORY_LOCATIONS.rescue,
+      17: STORY_LOCATIONS.jeepStart
+    };
+    this.setTarget(targets[stage] || null);
     this.setObjective(labels[stage] || labels[0]);
   }
 };
@@ -645,7 +671,10 @@ const VehicleManager = {
     });
   },
   enter() {
-    if (!this.jeep || this.state === "broken" || this.state === "empty") return;
+    if (!this.jeep || this.state === "broken" || this.state === "empty") {
+      CutsceneManager.show("The jeep will not start. Continue on foot.", 3);
+      return;
+    }
     playerInCar = true;
     carSpeed = 0;
     CutsceneManager.show("You are driving the jeep. Follow the road.", 3);
@@ -784,6 +813,8 @@ const StoryManager = {
     loadStoryModel("clockTower", { x: STORY_LOCATIONS.clockTower.x, z: STORY_LOCATIONS.clockTower.z, targetHeight: 82, boxCollider: true, onLoad: (model) => storyObjects.clockTower = model });
     createStoryItems();
     createStoryLocations();
+    createStoryRoadNetwork();
+    spawnAmbientThreats();
     this.advanceTo(0);
     CutsceneManager.intro();
   },
@@ -850,6 +881,7 @@ function createStoryWorld() {
 
 function createStoryLocations() {
   createMarker("Ranger Camp", STORY_LOCATIONS.rangerCamp.x, STORY_LOCATIONS.rangerCamp.z, 0x668866);
+  createMarker("Clock Tower", STORY_LOCATIONS.clockTower.x, STORY_LOCATIONS.clockTower.z, 0xff3333);
   createMarker("Bunker", STORY_LOCATIONS.bunker.x, STORY_LOCATIONS.bunker.z, 0x44ff88);
   createMarker("Ancient Mine", STORY_LOCATIONS.mine.x, STORY_LOCATIONS.mine.z, 0xffdd55);
   caveGate = createMarker("Cave Gate", STORY_LOCATIONS.caveGate.x, STORY_LOCATIONS.caveGate.z, 0x33ff99);
@@ -857,14 +889,58 @@ function createStoryLocations() {
 }
 
 function createMarker(label, x, z, color) {
+  const group = new THREE.Group();
   const marker = new THREE.Mesh(
     new THREE.CylinderGeometry(5, 5, 1.2, 16),
     new THREE.MeshStandardMaterial({ color, emissive: color, emissiveIntensity: 0.15 })
   );
-  marker.position.set(x, getTerrainHeight(x, z) + 0.7, z);
-  marker.userData.label = label;
-  scene.add(marker);
-  return marker;
+  marker.position.y = 0.7;
+  group.add(marker);
+
+  const beam = new THREE.Mesh(
+    new THREE.CylinderGeometry(1.2, 1.2, 55, 12, 1, true),
+    new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.24, depthWrite: false })
+  );
+  beam.position.y = 28;
+  group.add(beam);
+
+  const ring = new THREE.Mesh(
+    new THREE.TorusGeometry(7, 0.35, 8, 32),
+    new THREE.MeshBasicMaterial({ color })
+  );
+  ring.rotation.x = Math.PI / 2;
+  ring.position.y = 2.4;
+  group.add(ring);
+
+  group.position.set(x, getTerrainHeight(x, z), z);
+  group.userData.label = label;
+  scene.add(group);
+  storyBeacons.push(group);
+  return group;
+}
+
+function createStoryRoadNetwork() {
+  createRoadStrip(0, -335, 14, 360, 0);
+  createRoadStrip(-130, -650, 12, 280, Math.PI / 2);
+  createRoadStrip(140, -720, 12, 260, Math.PI / 2);
+  createRoadStrip(220, -450, 11, 420, 0.45);
+  createRoadStrip(0, -760, 12, 220, 0);
+}
+
+function createRoadStrip(x, z, width, length, rotY) {
+  const road = new THREE.Mesh(
+    new THREE.BoxGeometry(width, 0.18, length),
+    new THREE.MeshStandardMaterial({ color: 0x252525, roughness: 0.95 })
+  );
+  road.position.set(x, getTerrainHeight(x, z) + 0.08, z);
+  road.rotation.y = rotY;
+  road.receiveShadow = true;
+  scene.add(road);
+}
+
+function spawnAmbientThreats() {
+  spawnStoryEnemy("ghostWolf", STORY_LOCATIONS.mansion.x + 55, STORY_LOCATIONS.mansion.z + 55);
+  spawnStoryEnemy("ghostWolf", STORY_LOCATIONS.clockTower.x + 42, STORY_LOCATIONS.clockTower.z + 34);
 }
 
 function createStoryItems() {
@@ -903,6 +979,13 @@ function rotateStoryPickups(delta) {
     if (!item || !item.visible) return;
     item.rotation.y += delta * 1.8;
     item.position.y = getTerrainHeight(item.position.x, item.position.z) + 2 + Math.sin(Date.now() * 0.003) * 0.25;
+  });
+  storyBeacons.forEach((beacon) => {
+    if (!beacon || !beacon.visible) return;
+    beacon.rotation.y += delta * 0.7;
+    beacon.children.forEach((child) => {
+      if (child.geometry && child.geometry.type === "TorusGeometry") child.rotation.z += delta * 1.4;
+    });
   });
 }
 
@@ -976,8 +1059,11 @@ function avoidActorHardClip(actor, radius) {
 function autoAdvanceByLocation() {
   if (!player) return;
   const p = player.position;
+  if (StoryManager.stage === 1 && p.z < -40) StoryManager.advanceTo(2);
   if (StoryManager.stage === 2 && p.distanceTo(STORY_LOCATIONS.mansion) < 60) StoryManager.advanceTo(3);
   if (StoryManager.stage === 3 && inventory.batteryPart && inventory.fuelCan && inventory.enginePart) StoryManager.advanceTo(5);
+  if (StoryManager.stage === 6 && p.distanceTo(STORY_LOCATIONS.rangerCamp) < 70) StoryManager.advanceTo(7);
+  if (StoryManager.stage === 7 && p.z < -690) StoryManager.advanceTo(8);
   if (StoryManager.stage === 9 && storyObjects.map && p.distanceTo(storyObjects.map.position) < STORY_INTERACTION_RANGE) StoryManager.advanceTo(10);
   if (StoryManager.stage === 10) {
     storyObjects.redDiamond.visible = true;
@@ -2135,7 +2221,14 @@ function updateBatteryUI() {
 // ✅ OBJECTIVE UI
 function updateObjectiveUI() {
   const objectiveText = getEl("objectiveText");
-  if (objectiveText) objectiveText.innerText = currentObjective;
+  if (objectiveText) {
+    let targetInfo = "";
+    if (currentStoryTarget && player) {
+      const dist = Math.round(player.position.distanceTo(currentStoryTarget));
+      targetInfo = " | Target: " + dist + "m";
+    }
+    objectiveText.innerText = currentObjective + targetInfo;
+  }
 }
 
 function damagePlayer(amount) {
@@ -2201,6 +2294,7 @@ function animate() {
     handleCollisions();
     updateStaminaUI();
     updateBatteryUI();
+    updateObjectiveUI();
 
     // ✅ RENDER SHADOW FIGURE IF VISIBLE
     if (shadowFigure && shadowFigure.userData.visible) {
@@ -2302,14 +2396,75 @@ function createFallbackStoryModel(key, options = {}) {
       : new THREE.CylinderGeometry(1, 1, STORY_CHARACTER_HEIGHT, 12);
     mesh = new THREE.Mesh(characterGeometry, material);
     mesh.position.y = STORY_CHARACTER_HEIGHT * 0.5;
+  } else if (key === "jeep" || key === "rustyCar") {
+    const body = new THREE.Mesh(new THREE.BoxGeometry(12, 3, 18), material);
+    body.position.y = 3;
+    body.castShadow = true;
+    body.receiveShadow = true;
+    group.add(body);
+
+    const cabin = new THREE.Mesh(
+      new THREE.BoxGeometry(8, 3.2, 7),
+      new THREE.MeshStandardMaterial({ color: 0x1a2a36, roughness: 0.55, metalness: 0.2 })
+    );
+    cabin.position.set(0, 5.4, -1.5);
+    cabin.castShadow = true;
+    group.add(cabin);
+
+    const hood = new THREE.Mesh(
+      new THREE.BoxGeometry(9, 1.4, 5),
+      new THREE.MeshStandardMaterial({ color: 0x2f4b63, roughness: 0.7 })
+    );
+    hood.position.set(0, 4.1, -7.4);
+    hood.castShadow = true;
+    group.add(hood);
+
+    const wheelMaterial = new THREE.MeshStandardMaterial({ color: 0x070707, roughness: 0.9 });
+    [[-6.2, 1.2, -6], [6.2, 1.2, -6], [-6.2, 1.2, 6], [6.2, 1.2, 6]].forEach(([wx, wy, wz]) => {
+      const wheel = new THREE.Mesh(new THREE.CylinderGeometry(1.4, 1.4, 1, 16), wheelMaterial);
+      wheel.rotation.z = Math.PI / 2;
+      wheel.position.set(wx, wy, wz);
+      wheel.castShadow = true;
+      group.add(wheel);
+    });
+
+    const lightMaterial = new THREE.MeshBasicMaterial({ color: 0xfff2b0 });
+    [-3, 3].forEach((lx) => {
+      const lamp = new THREE.Mesh(new THREE.SphereGeometry(0.65, 12, 8), lightMaterial);
+      lamp.position.set(lx, 3.5, -9.3);
+      group.add(lamp);
+      const glow = new THREE.PointLight(0xfff0b0, 1.4, 35);
+      glow.position.copy(lamp.position);
+      group.add(glow);
+    });
   } else if (key === "road") {
     mesh = new THREE.Mesh(new THREE.BoxGeometry(16, 0.2, 650), material);
   } else if (key === "mansion") {
     mesh = new THREE.Mesh(new THREE.BoxGeometry(82, 36, 68), material);
     mesh.position.y = 18;
   } else if (key === "clockTower") {
-    mesh = new THREE.Mesh(new THREE.BoxGeometry(24, 70, 24), material);
-    mesh.position.y = 35;
+    const tower = new THREE.Mesh(new THREE.BoxGeometry(22, 66, 22), material);
+    tower.position.y = 33;
+    tower.castShadow = true;
+    tower.receiveShadow = true;
+    group.add(tower);
+
+    const roof = new THREE.Mesh(
+      new THREE.ConeGeometry(18, 20, 4),
+      new THREE.MeshStandardMaterial({ color: 0x2f2f38, roughness: 0.8 })
+    );
+    roof.position.y = 76;
+    roof.rotation.y = Math.PI / 4;
+    roof.castShadow = true;
+    group.add(roof);
+
+    const clockFace = new THREE.Mesh(
+      new THREE.CylinderGeometry(6, 6, 0.4, 32),
+      new THREE.MeshStandardMaterial({ color: 0xf2e4b8, emissive: 0x332200, emissiveIntensity: 0.25 })
+    );
+    clockFace.rotation.x = Math.PI / 2;
+    clockFace.position.set(0, 54, -11.3);
+    group.add(clockFace);
   } else if (key === "teaShop") {
     mesh = new THREE.Mesh(new THREE.BoxGeometry(22, 12, 18), material);
     mesh.position.y = 6;
@@ -2318,13 +2473,15 @@ function createFallbackStoryModel(key, options = {}) {
     mesh.position.y = 2.5;
   }
 
-  mesh.castShadow = true;
-  mesh.receiveShadow = true;
-  group.add(mesh);
+  if (mesh) {
+    mesh.castShadow = true;
+    mesh.receiveShadow = true;
+    group.add(mesh);
+  }
   snapModelToGround(group, options.x || 0, options.z || 0, options.rotY || 0);
   group.userData.storyKey = key;
   if (options.colliderRadius) addCylinderCollider(group.position.x, group.position.z, options.colliderRadius);
-  if (options.boxCollider) addBoxCollider(mesh);
+  if (options.boxCollider) addBoxCollider(mesh || group);
   if (options.onLoad) options.onLoad(group, { animations: [] });
   return group;
 }
