@@ -17,15 +17,12 @@ let granny;
 let enemyMixer = null;
 let friends = [];
 let friendMixers = [];
-let oldHouseModel = null;
-let roadModel = null;
-let jeepModel = null;
 let repairPartObjects = [];
-let forestStoryTriggered = false;
-let diamondStoryDiscovered = false;
 let playerInCar = false;
 let carSpeed = 0;
 let carYaw = Math.PI;
+let forestNoiseTriggered = false;
+let diamondStoryTriggered = false;
 
 let caveGate;
 
@@ -65,8 +62,8 @@ let inventory = {
 };
 
 // ✅ OBJECTIVE SYSTEM
-let currentObjective = "Repair the Car: Find Battery, Fuel Can, and Engine Part";
-let objectiveStage = 0; // Opening: parts, repair attempt, forest noise, diamond story, forest
+let currentObjective = "Broken Car: Find repair parts in the old house";
+let objectiveStage = 0;
 
 // ✅ SOUND SYSTEM (Web Audio API)
 let audioContext;
@@ -124,24 +121,16 @@ const MODEL_PATHS = {
   granny: "models/granny_blooded_nightmare.glb",
   tree: "models/psx_tree.glb",
   oldHouse: "models/gulli_bulli_house.glb",
-  road: "models/road_hd.glb",
-  jeep: "models/jeep.glb",
   rustyCar: "models/old_rusty_car.glb",
   babaFriend: "models/baba_full_rig_charactar_gulli_bulli_wale_baba.glb",
   hero: "models/motu_patlu.glb",
+  jeep: "models/jeep.glb",
   iceEnemy: "models/ice_scream_rod_nightmare_blooded.glb"
 };
 
 const MODEL_SCALE = {
-  granny: 4,
-  tree: 3,
-  oldHouse: 5,
-  road: 6,
-  jeep: 2.2,
-  rustyCar: 1.5,
-  babaFriend: 2.2,
-  hero: 2.2,
-  iceEnemy: 3
+  granny: 1,
+  tree: 3
 };
 
 let treeTemplate = null;
@@ -171,45 +160,58 @@ function enableModelShadows(root) {
   });
 }
 
-function cloneModel(root) {
-  if (THREE.SkeletonUtils && THREE.SkeletonUtils.clone) {
-    return THREE.SkeletonUtils.clone(root);
-  }
-  return root.clone(true);
+function fitModelToHeight(model, targetHeight) {
+  const box = new THREE.Box3().setFromObject(model);
+  const size = new THREE.Vector3();
+  box.getSize(size);
+  if (size.y > 0) model.scale.multiplyScalar(targetHeight / size.y);
 }
 
-function placeModelOnTerrain(model, x, z, scale = 1, rotY = 0) {
-  model.scale.setScalar(scale);
-  model.position.set(x, getTerrainHeight(x, z), z);
+function fitModelToLength(model, targetLength) {
+  const box = new THREE.Box3().setFromObject(model);
+  const size = new THREE.Vector3();
+  box.getSize(size);
+  const currentLength = Math.max(size.x, size.z);
+  if (currentLength > 0) model.scale.multiplyScalar(targetLength / currentLength);
+}
+
+function snapModelToGround(model, x, z, rotY = 0) {
   model.rotation.y = rotY;
-  enableModelShadows(model);
-  scene.add(model);
-  return model;
+  model.position.set(x, 0, z);
+  model.updateMatrixWorld(true);
+
+  const groundY = getTerrainHeight(x, z);
+  const box = new THREE.Box3().setFromObject(model);
+  model.position.y += groundY - box.min.y;
+  model.updateMatrixWorld(true);
 }
 
-function loadStaticModel(path, options = {}) {
+function loadSceneModel(path, options) {
   return loadGLB(path)
     .then((gltf) => {
       const model = gltf.scene;
-      placeModelOnTerrain(
-        model,
-        options.x || 0,
-        options.z || 0,
-        options.scale || 1,
-        options.rotY || 0
-      );
+      enableModelShadows(model);
 
-      if (options.colliderRadius) {
-        addCylinderCollider(options.x || 0, options.z || 0, options.colliderRadius);
-      }
+      if (options.targetHeight) fitModelToHeight(model, options.targetHeight);
+      if (options.targetLength) fitModelToLength(model, options.targetLength);
+
+      snapModelToGround(model, options.x, options.z, options.rotY || 0);
+      scene.add(model);
 
       if (options.onLoad) options.onLoad(model, gltf);
       return model;
     })
     .catch((error) => {
-      console.error("MODEL LOAD ERROR", path, error);
+      console.error("MODEL LOAD ERROR:", path, error);
       return null;
     });
+}
+
+function cloneModel(root) {
+  if (THREE.SkeletonUtils && THREE.SkeletonUtils.clone) {
+    return THREE.SkeletonUtils.clone(root);
+  }
+  return root.clone(true);
 }
 
 function loadTreeTemplate() {
@@ -463,17 +465,14 @@ function createStars() {
 function createWorld() {
   createTerrain();
   createMansion();
-  createRoadModel();
   createForest();
   createRocks();
   createGranny();
-  createFriendModels();
-  createRepairParts();
   createKey();
   createNotes();
   createShadowFigure();
 
-  createBrokenCar();
+  // createBrokenCar();  
 }
 
 function getTerrainHeight(x, z) {
@@ -527,19 +526,6 @@ road.receiveShadow = true;
 scene.add(road);
 
 }
-
-function createRoadModel() {
-  loadStaticModel(MODEL_PATHS.road, {
-    x: 0,
-    z: -110,
-    scale: MODEL_SCALE.road,
-    rotY: 0,
-    onLoad: (model) => {
-      roadModel = model;
-      console.log("ROAD MODEL LOADED");
-    }
-  });
-}
   
 function createMansion() {
   const mansion = new THREE.Mesh(
@@ -574,19 +560,6 @@ function createMansion() {
 
   // ✅ MANSION INTERIOR (BASEMENT/ROOMS)
   createMansionInterior(mansion.position);
-
-  loadStaticModel(MODEL_PATHS.oldHouse, {
-    x: 0,
-    z: -420,
-    scale: MODEL_SCALE.oldHouse,
-    rotY: Math.PI,
-    colliderRadius: 35,
-    onLoad: (model) => {
-      oldHouseModel = model;
-      mansion.visible = false;
-      console.log("OLD HOUSE MODEL LOADED");
-    }
-  });
 }
 
 // ✅ CREATE MANSION INTERIOR
@@ -752,70 +725,13 @@ function createKey() {
   scene.add(keyPickup);
 }
 
-function createRepairParts() {
-  const parts = [
-    { id: "batteryPart", label: "Battery", color: 0x2f7dff, x: -18, z: -382 },
-    { id: "fuelCan", label: "Fuel Can", color: 0xd11f1f, x: 22, z: -430 },
-    { id: "enginePart", label: "Engine Part", color: 0xb0b0b0, x: 12, z: -462 }
-  ];
-
-  parts.forEach((part) => {
-    const mesh = new THREE.Mesh(
-      new THREE.BoxGeometry(2.2, 1.6, 2.2),
-      new THREE.MeshStandardMaterial({ color: part.color, roughness: 0.65, metalness: 0.25 })
-    );
-    mesh.position.set(part.x, getTerrainHeight(part.x, part.z) + 1.4, part.z);
-    mesh.castShadow = true;
-    mesh.userData.type = "repairPart";
-    mesh.userData.partId = part.id;
-    mesh.userData.label = part.label;
-    scene.add(mesh);
-    repairPartObjects.push(mesh);
-  });
-}
-
-function createFriendModels() {
-  const friendSpawns = [
-    { path: MODEL_PATHS.babaFriend, scale: MODEL_SCALE.babaFriend, x: -8, z: -160, rotY: Math.PI },
-    { path: MODEL_PATHS.hero, scale: MODEL_SCALE.hero, x: 9, z: -160, rotY: Math.PI }
-  ];
-
-  friendSpawns.forEach((spawn) => {
-    loadStaticModel(spawn.path, {
-      x: spawn.x,
-      z: spawn.z,
-      scale: spawn.scale,
-      rotY: spawn.rotY,
-      onLoad: (model, gltf) => {
-        friends.push(model);
-        if (gltf.animations && gltf.animations.length > 0) {
-          const mixer = new THREE.AnimationMixer(model);
-          gltf.animations.forEach((clip) => mixer.clipAction(clip).play());
-          friendMixers.push(mixer);
-        }
-      }
-    });
-  });
-
-  loadStaticModel(MODEL_PATHS.jeep, {
-    x: -18,
-    z: -150,
-    scale: MODEL_SCALE.jeep,
-    rotY: Math.PI,
-    colliderRadius: 5,
-    onLoad: (model) => {
-      jeepModel = model;
-    }
-  });
-}
-
 // ✅ CREATE NOTES IN WORLD
 function createNotes() {
   const noteTexts = [
-    "Forest me mat jana... kuchh hume dekh raha hai.",
-    "Red, Green, Yellow diamonds cave ka raasta kholte hain.",
-    "Crown ko haath lagate hi Skeleton King jaag uthta hai.",
-    "Car repair ke bina yahan se nikalna mushkil hai."
+    "HELP... TRAPPED HERE",
+    "DON'T GO OUT AT NIGHT",
+    "IT WATCHES... ALWAYS",
+    "THE KEY IS HIDDEN"
   ];
 
   for (let i = 0; i < 3; i++) {
@@ -1102,12 +1018,6 @@ function updatePlayer(delta) {
   player.rotation.y = yaw;
   camera.rotation.x = pitch;
 
-  if (playerInCar) {
-    updateCarDriving(delta);
-    checkInteractions();
-    return;
-  }
-
   lastSafePosition.copy(player.position);
 
   const currentSpeed = running ? runSpeed : walkSpeed;
@@ -1172,26 +1082,6 @@ function checkInteractions() {
 
   let nearItem = false;
 
-  if (brokenCar && player.position.distanceTo(brokenCar.position) < 12) {
-    interactionText.style.display = "block";
-    interactionText.innerText = playerInCar
-      ? "Press E to Exit Car"
-      : hasAllRepairParts()
-        ? "Press E to Repair / Enter Car"
-        : "Find Battery, Fuel Can, and Engine Part";
-    nearItem = true;
-  }
-
-  for (let part of repairPartObjects) {
-    const partId = part.userData.partId;
-    if (!inventory[partId] && player.position.distanceTo(part.position) < interactionRange) {
-      interactionText.style.display = "block";
-      interactionText.innerText = "Press E to Pick Up " + part.userData.label;
-      nearItem = true;
-      break;
-    }
-  }
-
   // ✅ CHECK KEY
   if (keyPickup && !inventory.key) {
     const keyDist = player.position.distanceTo(keyPickup.position);
@@ -1240,31 +1130,6 @@ function checkInteractions() {
 function handleInteraction() {
   const interactionRange = 5;
 
-  if (brokenCar && player.position.distanceTo(brokenCar.position) < 12) {
-    if (playerInCar) {
-      exitCar();
-      return;
-    }
-
-    if (hasAllRepairParts()) {
-      repairAndEnterCar();
-      return;
-    }
-  }
-
-  for (let i = 0; i < repairPartObjects.length; i++) {
-    const part = repairPartObjects[i];
-    const partId = part.userData.partId;
-    if (!inventory[partId] && player.position.distanceTo(part.position) < interactionRange) {
-      inventory[partId] = true;
-      scene.remove(part);
-      playSound("key_pickup");
-      updateOpeningProgress();
-      updateInventoryUI();
-      return;
-    }
-  }
-
   // ✅ PICK UP KEY
   if (keyPickup && !inventory.key) {
     if (player.position.distanceTo(keyPickup.position) < interactionRange) {
@@ -1307,10 +1172,6 @@ function handleInteraction() {
     if (player.position.distanceTo(note.position) < interactionRange) {
       alert("NOTE: " + note.userData.text);
       inventory.notesCollected++;
-      if (!diamondStoryDiscovered && note.userData.text.indexOf("diamonds") !== -1) {
-        diamondStoryDiscovered = true;
-        updateObjective(4);
-      }
       notesInWorld.splice(i, 1);
       scene.remove(note);
       updateInventoryUI();
@@ -1319,70 +1180,15 @@ function handleInteraction() {
   }
 }
 
-function hasAllRepairParts() {
-  return inventory.batteryPart && inventory.fuelCan && inventory.enginePart;
-}
-
-function updateOpeningProgress() {
-  if (hasAllRepairParts()) {
-    updateObjective(1);
-  } else {
-    const missing = [];
-    if (!inventory.batteryPart) missing.push("Battery");
-    if (!inventory.fuelCan) missing.push("Fuel Can");
-    if (!inventory.enginePart) missing.push("Engine Part");
-    currentObjective = "Repair the Car: Find " + missing.join(", ");
-    updateObjectiveUI();
-  }
-}
-
-function repairAndEnterCar() {
-  if (!forestStoryTriggered) {
-    forestStoryTriggered = true;
-    playSound("tree_creak");
-    alert("Engine start hota hai... lekin forest se ek ajeeb awaaz aati hai.");
-    updateObjective(2);
-    return;
-  }
-
-  enterCar();
-}
-
-function enterCar() {
-  if (!brokenCar) return;
-  playerInCar = true;
-  carSpeed = 0;
-  carYaw = brokenCar.rotation.y;
-  updateObjective(diamondStoryDiscovered ? 5 : 3);
-}
-
-function exitCar() {
-  if (!brokenCar) return;
-  playerInCar = false;
-  carSpeed = 0;
-  const exitOffset = new THREE.Vector3(5, 0, 0).applyAxisAngle(
-    new THREE.Vector3(0, 1, 0),
-    carYaw
-  );
-  player.position.set(
-    brokenCar.position.x + exitOffset.x,
-    getTerrainHeight(brokenCar.position.x + exitOffset.x, brokenCar.position.z + exitOffset.z) + playerHeight,
-    brokenCar.position.z + exitOffset.z
-  );
-  lastSafePosition.copy(player.position);
-}
-
 // ✅ UPDATE OBJECTIVE
 function updateObjective(stage) {
   objectiveStage = stage;
   
   const stages = [
-    "Repair the Car: Find Battery, Fuel Can, and Engine Part",
-    "Return to the Broken Car and try to repair it",
-    "Strange noise came from the forest. Search the old house notes",
-    "Discover the diamond story in the old house",
-    "Enter the Dense Forest and find the Red, Green, and Yellow Diamonds",
-    "Drive carefully through the forest road"
+    "Find the Mansion Key",
+    "Reach the Mansion",
+    "Unlock the Door",
+    "Escape the Island"
   ];
   
   currentObjective = stages[stage] || stages[0];
@@ -1393,7 +1199,6 @@ function updateObjective(stage) {
 function updateInventoryUI() {
   const invKey = getEl("inventoryKey");
   const invNotes = getEl("inventoryNotes");
-  const invParts = getEl("inventoryParts");
 
   if (invKey) {
     invKey.style.display = inventory.key ? "block" : "none";
@@ -1401,14 +1206,6 @@ function updateInventoryUI() {
 
   if (invNotes) {
     invNotes.innerText = "Notes: " + inventory.notesCollected;
-  }
-
-  if (invParts) {
-    const owned = [];
-    if (inventory.batteryPart) owned.push("Battery");
-    if (inventory.fuelCan) owned.push("Fuel");
-    if (inventory.enginePart) owned.push("Engine");
-    invParts.innerText = "Parts: " + (owned.length ? owned.join(", ") : "None");
   }
 }
 
@@ -1738,7 +1535,6 @@ function animate() {
 
   if (!paused) {
     if (enemyMixer) enemyMixer.update(delta);
-    friendMixers.forEach((mixer) => mixer.update(delta));
 
     updatePlayer(delta);
     updateGravity(delta);
@@ -1766,13 +1562,13 @@ function createBrokenCar() {
     const loader = createGLTFLoader();
 
     loader.load(
-        MODEL_PATHS.rustyCar,
+        "models/old_rusty_car.glb",
 
         function (gltf) {
 
             brokenCar = gltf.scene;
 
-            brokenCar.scale.setScalar(MODEL_SCALE.rustyCar);
+            brokenCar.scale.set(1.5, 1.5, 1.5);
 
             brokenCar.position.set(
                 0,
@@ -1781,11 +1577,8 @@ function createBrokenCar() {
             );
 
             brokenCar.rotation.y = Math.PI;
-            carYaw = brokenCar.rotation.y;
-            brokenCar.userData.type = "driveableCar";
 
             scene.add(brokenCar);
-            addCylinderCollider(0, -180, 6);
 
             console.log("Rusty Car Loaded");
         },
@@ -1796,47 +1589,4 @@ function createBrokenCar() {
             console.error("Car Error:", error);
         }
     );
-}
-
-function updateCarDriving(delta) {
-  if (!brokenCar) return;
-
-  const acceleration = 24;
-  const maxSpeed = 38;
-  const reverseSpeed = -16;
-  const friction = 18;
-  const turnSpeed = 1.7;
-
-  if (move.w) carSpeed += acceleration * delta;
-  if (move.s) carSpeed -= acceleration * delta;
-  if (!move.w && !move.s) {
-    if (carSpeed > 0) carSpeed = Math.max(0, carSpeed - friction * delta);
-    if (carSpeed < 0) carSpeed = Math.min(0, carSpeed + friction * delta);
-  }
-
-  carSpeed = THREE.MathUtils.clamp(carSpeed, reverseSpeed, maxSpeed);
-
-  const turnInput = (move.a ? 1 : 0) + (move.d ? -1 : 0);
-  if (Math.abs(carSpeed) > 0.5 && turnInput !== 0) {
-    carYaw += turnInput * turnSpeed * delta * Math.sign(carSpeed);
-  }
-
-  const forward = new THREE.Vector3(0, 0, -1).applyAxisAngle(
-    new THREE.Vector3(0, 1, 0),
-    carYaw
-  );
-
-  brokenCar.position.addScaledVector(forward, carSpeed * delta);
-  brokenCar.position.x = THREE.MathUtils.clamp(brokenCar.position.x, -WORLD_WIDTH / 2 + 15, WORLD_WIDTH / 2 - 15);
-  brokenCar.position.z = THREE.MathUtils.clamp(brokenCar.position.z, -WORLD_DEPTH / 2 + 15, WORLD_DEPTH / 2 - 15);
-  brokenCar.position.y = getTerrainHeight(brokenCar.position.x, brokenCar.position.z);
-  brokenCar.rotation.y = carYaw;
-
-  player.position.set(
-    brokenCar.position.x,
-    brokenCar.position.y + playerHeight + 1.2,
-    brokenCar.position.z
-  );
-  yaw = carYaw;
-  lastSafePosition.copy(player.position);
 }
