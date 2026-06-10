@@ -101,6 +101,9 @@ function showEl(id, display = "block") {
 
 var GLB = window.GLB || {
   // pura GLB manager code yahan
+
+  models/enemy 3 rod advanced.glb
+
 };
 
 window.GLB = GLB;
@@ -108,7 +111,7 @@ window.GLTFLoader = window.GLTFLoader || THREE.GLTFLoader;
 const GLTFLoader = window.GLTFLoader;
 
 const MODEL_PATHS = {
-  granny: "models/granny_blooded_nightmare.glb",
+  granny: "models/enemy 3 rod advanced.glb",
   tree: "models/psx_tree.glb"
 };
 
