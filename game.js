@@ -25,9 +25,9 @@ animate();
 function init() {
     clock = new THREE.Clock();
 
-    scene = new THREE.Scene();
-    scene.background = new THREE.Color(0x111111);
-    scene.fog = new THREE.Fog(0x111111, 20, 180);
+scene = new THREE.Scene();
+scene.background = new THREE.Color(0x87CEEB);
+scene.fog = new THREE.Fog(0xbfdfff, 80, 300);
 
     camera = new THREE.PerspectiveCamera(
         75,
