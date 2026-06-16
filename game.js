@@ -19,9 +19,6 @@ let enemyTarget = new THREE.Vector3();
 
 let gameOver = false;
 
-init();
-animate();
-
 function init() {
     clock = new THREE.Clock();
 
