@@ -1,468 +1,233 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>THE WATCHER</title>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-  <link rel="stylesheet" href="style.css">
+<title>MAZE OF THE WATCHER</title>
 
-  <style>
-    * {
-      box-sizing: border-box;
-    }
+<link rel="stylesheet" href="style.css">
 
-    html,
-    body {
-      width: 100%;
-      height: 100%;
-    }
+<style>
+*{
+margin:0;
+padding:0;
+box-sizing:border-box;
+}
 
-    body {
-      margin: 0;
-      overflow: hidden;
-      font-family: Arial, sans-serif;
-      background: #000;
-    }
+body{
+overflow:hidden;
+font-family:Arial,sans-serif;
+background:#87CEEB;
+}
 
-    canvas {
-      display: block;
-    }
+canvas{
+display:block;
+}
 
-    #home,
-    #menu,
-    #loading,
-    #gameOver,
-    #victory {
-      position: absolute;
-      inset: 0;
-      width: 100%;
-      height: 100%;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      flex-direction: column;
-      background: radial-gradient(circle at center, #111 0%, #000 70%);
-      color: #fff;
-      z-index: 50;
-      text-align: center;
-      padding: 24px;
-    }
+.screen{
+position:absolute;
+top:0;
+left:0;
+width:100%;
+height:100%;
+display:flex;
+justify-content:center;
+align-items:center;
+flex-direction:column;
+background:linear-gradient(to bottom,#87CEEB,#ffffff);
+z-index:100;
+text-align:center;
+}
 
-    #loading,
-    #menu,
-    #gameOver,
-    #victory {
-      display: none;
-    }
+.hidden{
+display:none;
+}
 
-    h1 {
-      font-size: 46px;
-      letter-spacing: 4px;
-      margin: 0 0 20px;
-      color: #f2f2f2;
-      text-shadow: 0 0 18px rgba(180, 0, 0, 0.8);
-    }
+h1{
+font-size:60px;
+color:#111;
+margin-bottom:20px;
+letter-spacing:3px;
+}
 
-    h2 {
-      font-size: 28px;
-      margin: 0 0 18px;
-      letter-spacing: 2px;
-    }
+h2{
+font-size:30px;
+margin-bottom:20px;
+}
 
-    p {
-      max-width: 520px;
-      margin: 0 0 18px;
-      color: #bdbdbd;
-      line-height: 1.5;
-    }
+p{
+max-width:650px;
+font-size:18px;
+line-height:1.6;
+margin-bottom:20px;
+color:#333;
+}
 
-    button {
-      min-width: 160px;
-      padding: 12px 24px;
-      margin-top: 10px;
-      cursor: pointer;
-      border: 1px solid rgba(255, 255, 255, 0.25);
-      border-radius: 6px;
-      background: #850000;
-      color: #fff;
-      font-size: 16px;
-      font-weight: bold;
-    }
+button{
+padding:15px 30px;
+margin:10px;
+border:none;
+background:#111;
+color:white;
+font-size:18px;
+cursor:pointer;
+border-radius:8px;
+transition:0.3s;
+}
 
-    button:hover {
-      background: #b30000;
-    }
+button:hover{
+background:#333;
+}
 
-    #gameUI {
-      position: absolute;
-      inset: 0;
-      width: 100%;
-      height: 100%;
-      pointer-events: none;
-      z-index: 20;
-      display: none;
-      color: #fff;
-      font-weight: bold;
-      text-shadow: 0 2px 4px #000;
-    }
+#gameUI{
+position:absolute;
+top:0;
+left:0;
+width:100%;
+height:100%;
+pointer-events:none;
+display:none;
+z-index:20;
+}
 
-    #gameUI.enemy-near::before,
-    #gameUI.low-health::after {
-      content: "";
-      position: absolute;
-      inset: 0;
-      pointer-events: none;
-    }
+#levelBox{
+position:absolute;
+top:20px;
+left:20px;
+font-size:24px;
+font-weight:bold;
+color:white;
+text-shadow:2px 2px 5px black;
+}
 
-    #gameUI.enemy-near::before {
-      border: 10px solid rgba(170, 0, 0, 0.35);
-    }
+#objectiveBox{
+position:absolute;
+top:20px;
+left:50%;
+transform:translateX(-50%);
+font-size:20px;
+color:white;
+text-shadow:2px 2px 5px black;
+}
 
-    #gameUI.low-health::after {
-      background: radial-gradient(circle, transparent 45%, rgba(120, 0, 0, 0.35) 100%);
-    }
+#crosshair{
+position:absolute;
+left:50%;
+top:50%;
+transform:translate(-50%,-50%);
+font-size:35px;
+color:white;
+}
 
-    #gameUI.danger-shake {
-      animation: dangerShake 0.12s infinite;
-    }
+#gameOver h1{
+color:red;
+}
 
-    @keyframes dangerShake {
-      0% { transform: translate(0, 0); }
-      25% { transform: translate(2px, -1px); }
-      50% { transform: translate(-1px, 2px); }
-      75% { transform: translate(1px, 1px); }
-      100% { transform: translate(0, 0); }
-    }
-
-    #healthBox {
-      position: absolute;
-      top: 16px;
-      left: 16px;
-      font-size: 18px;
-    }
-
-    #healthBar,
-    #staminaBar {
-      width: 180px;
-      height: 16px;
-      margin-top: 6px;
-      border: 2px solid #fff;
-      background: rgba(255, 255, 255, 0.15);
-    }
-
-    #healthFill,
-    #staminaFill {
-      width: 100%;
-      height: 100%;
-      transition: width 0.15s linear;
-    }
-
-    #healthFill {
-      background: #d00000;
-    }
-
-    #staminaBox {
-      position: absolute;
-      top: 72px;
-      left: 16px;
-      font-size: 16px;
-    }
-
-    #staminaFill {
-      background: #e0b000;
-    }
-
-    #objectiveText {
-      position: absolute;
-      top: 18px;
-      left: 50%;
-      transform: translateX(-50%);
-      width: min(620px, 60%);
-      font-size: 18px;
-      text-align: center;
-    }
-
-    #interactionText {
-      position: absolute;
-      bottom: 150px;
-      left: 50%;
-      transform: translateX(-50%);
-      display: none;
-      width: min(520px, 90%);
-      font-size: 18px;
-      text-align: center;
-    }
-
-    #torchIndicator {
-      position: absolute;
-      top: 116px;
-      left: 16px;
-      font-size: 16px;
-    }
-
-    #inventoryBox {
-      position: absolute;
-      top: 146px;
-      left: 16px;
-      display: flex;
-      flex-direction: column;
-      gap: 6px;
-      font-size: 15px;
-    }
-
-    #inventoryKey {
-      display: none;
-      color: #ffd452;
-    }
-
-    #pauseBtn {
-      position: absolute;
-      top: 16px;
-      right: 16px;
-      pointer-events: auto;
-      width: 54px;
-      height: 54px;
-      min-width: 54px;
-      padding: 0;
-      border-radius: 50%;
-      font-size: 15px;
-      background: rgba(0, 0, 0, 0.7);
-      border: 2px solid #fff;
-    }
-
-    #crosshair {
-      position: absolute;
-      left: 50%;
-      top: 50%;
-      transform: translate(-50%, -50%);
-      font-size: 34px;
-      line-height: 1;
-      color: #fff;
-    }
-
-    #mobileControls {
-      position: absolute;
-      right: 22px;
-      bottom: 165px;
-      display: flex;
-      flex-direction: column;
-      gap: 12px;
-      pointer-events: auto;
-    }
-
-    #torchBtn,
-    #runBtn {
-      width: 98px;
-      height: 46px;
-      min-width: 98px;
-      padding: 0;
-      border-radius: 8px;
-      background: rgba(0, 0, 0, 0.72);
-      border: 2px solid #fff;
-      font-size: 15px;
-    }
-
-    #gameOver h1 {
-      color: #c90000;
-    }
-
-    #victory h1 {
-      color: #f1f1f1;
-    }
-
-    @media (max-width: 600px) {
-      h1 {
-        font-size: 34px;
-      }
-
-      h2 {
-        font-size: 22px;
-      }
-
-      button {
-        min-width: 145px;
-        font-size: 14px;
-      }
-
-      #healthBox,
-      #staminaBox,
-      #torchIndicator,
-      #inventoryBox {
-        font-size: 14px;
-      }
-
-      #healthBar,
-      #staminaBar {
-        width: 135px;
-        height: 14px;
-      }
-
-      #objectiveText {
-        top: 74px;
-        width: 88%;
-        font-size: 14px;
-      }
-
-      #pauseBtn {
-        width: 44px;
-        height: 44px;
-        min-width: 44px;
-        font-size: 13px;
-      }
-
-      #mobileControls {
-        right: 18px;
-        bottom: 160px;
-      }
-
-      #torchBtn,
-      #runBtn {
-        width: 86px;
-        min-width: 86px;
-        font-size: 13px;
-      }
-    }
-  </style>
+#victory h1{
+color:green;
+}
+</style>
 </head>
 
 <body>
-  <div id="home">
-    <h1>THE WATCHER</h1>
-    <p>Survive the night. Find the mansion. Escape before The Watcher finds you.</p>
-    <button type="button" onclick="startGame()">START</button>
-    <button type="button">SETTINGS</button>
-    <button type="button">CREDITS</button>
-  </div>
 
-  <div id="loading">
-    <h2>Loading The Watcher...</h2>
-  </div>
+<!-- HOME SCREEN -->
+<div id="home" class="screen">
+<h1>MAZE OF THE WATCHER</h1>
 
-  <div id="menu">
-    <h1>THE WATCHER</h1>
-    <button type="button" onclick="enterGame()">ENTER GAME</button>
-  </div>
+<p>
+You wake up trapped inside a mysterious maze.
+Every path leads deeper into darkness.
+The Watcher is hunting you.
+Find the exit.
+Survive each level.
+Escape the maze before it finds you.
+</p>
 
-  <div id="gameUI">
-    <div id="healthBox">
-      Health: <span id="healthValue">100</span>
-      <div id="healthBar">
-        <div id="healthFill"></div>
-      </div>
-    </div>
+<button onclick="startGame()">START JOURNEY</button>
+<button onclick="showStory()">STORY</button>
+<button onclick="showCredits()">CREDITS</button>
+</div>
 
-    <div id="staminaBox">
-      Stamina
-      <div id="staminaBar">
-        <div id="staminaFill"></div>
-      </div>
-    </div>
+<!-- STORY SCREEN -->
+<div id="story" class="screen hidden">
+<h2>THE STORY</h2>
 
-    <div id="torchIndicator">Torch: OFF</div>
+<p>
+Long ago, this maze was built to trap lost souls.
+Nobody escaped.
+Now you are inside it.
+Each level becomes harder.
+Each enemy becomes smarter.
+The only way out is forward.
+There is no turning back.
+</p>
 
-    <div id="inventoryBox">
-      <div id="inventoryKey">Key: Mansion Key</div>
-      <div id="inventoryNotes">Notes: 0</div>
-    </div>
+<button onclick="goHome()">BACK</button>
+</div>
 
-    <div id="objectiveText">Find the Mansion Key</div>
-    <div id="interactionText">Press E</div>
+<!-- LOADING -->
+<div id="loading" class="screen hidden">
+<h2>Loading Level...</h2>
+</div>
 
-    <button id="pauseBtn" type="button" onclick="togglePause()">Pause</button>
+<!-- GAME UI -->
+<div id="gameUI">
+<div id="levelBox">LEVEL 1</div>
+<div id="objectiveBox">Find the Exit</div>
+<div id="crosshair">+</div>
+</div>
 
-    <div id="crosshair">+</div>
+<!-- GAME OVER -->
+<div id="gameOver" class="screen hidden">
+<h1>GAME OVER</h1>
+<p>The Watcher caught you.</p>
 
-    <div id="mobileControls">
-      <button id="torchBtn" type="button" onclick="toggleTorch()">Torch</button>
-      <button id="runBtn" type="button">Run</button>
-    </div>
-  </div>
+<button onclick="restartGame()">RETRY</button>
+<button onclick="goHome()">MAIN MENU</button>
+</div>
 
-  <div id="gameOver">
-    <h1>YOU DIED</h1>
-    <button type="button" onclick="restartGame()">RETRY</button>
-    <button type="button" onclick="backToMenu()">MAIN MENU</button>
-  </div>
+<!-- VICTORY -->
+<div id="victory" class="screen hidden">
+<h1>YOU ESCAPED</h1>
+<p>You survived all maze levels.</p>
 
-  <div id="victory">
-    <h1>YOU ESCAPED</h1>
-    <button type="button" onclick="restartGame()">PLAY AGAIN</button>
-  </div>
+<button onclick="restartGame()">PLAY AGAIN</button>
+</div>
 
-  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/utils/SkeletonUtils.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.158/build/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.158/examples/js/loaders/GLTFLoader.js"></script>
 
-  <script>
-    window.GLTFLoader = window.GLTFLoader || (window.THREE && window.THREE.GLTFLoader);
+<script>
+function startGame(){
+document.getElementById("home").classList.add("hidden");
+document.getElementById("loading").classList.remove("hidden");
 
-    window.GLB = window.GLB || {
-      cache: new Map(),
+setTimeout(()=>{
+document.getElementById("loading").classList.add("hidden");
+document.getElementById("gameUI").style.display="block";
 
-      load(path, onLoad, onError) {
-        if (!window.THREE || !window.GLTFLoader) {
-          const error = new Error("Three.js or GLTFLoader is not loaded.");
-          console.error(error);
-          if (onError) onError(error);
-          return;
-        }
+init();
+animate();
+},1500);
+}
 
-        if (this.cache.has(path)) {
-          const cached = this.cache.get(path).clone(true);
-          if (onLoad) onLoad(cached);
-          return;
-        }
+function goHome(){
+location.reload();
+}
 
-        const loader = new window.GLTFLoader();
-        loader.load(
-          path,
-          (gltf) => {
-            const model = gltf.scene;
-            this.cache.set(path, model);
-            if (onLoad) onLoad(model.clone(true), gltf);
-          },
-          undefined,
-          (error) => {
-            console.error("GLB load failed:", path, error);
-            if (onError) onError(error);
-          }
-        );
-      },
+function showStory(){
+document.getElementById("home").classList.add("hidden");
+document.getElementById("story").classList.remove("hidden");
+}
 
-      addToScene(path, scene, options = {}) {
-        this.load(path, (model) => {
-          const {
-            position = { x: 0, y: 0, z: 0 },
-            rotation = { x: 0, y: 0, z: 0 },
-            scale = 1,
-            castShadow = true,
-            receiveShadow = true
-          } = options;
+function showCredits(){
+alert("Created by Mujeb Khan");
+}
+</script>
 
-          model.position.set(position.x || 0, position.y || 0, position.z || 0);
-          model.rotation.set(rotation.x || 0, rotation.y || 0, rotation.z || 0);
+<script src="game.js"></script>
 
-          if (typeof scale === "number") {
-            model.scale.set(scale, scale, scale);
-          } else {
-            model.scale.set(scale.x || 1, scale.y || 1, scale.z || 1);
-          }
-
-          model.traverse((child) => {
-            if (child.isMesh) {
-              child.castShadow = castShadow;
-              child.receiveShadow = receiveShadow;
-            }
-          });
-
-          scene.add(model);
-          if (options.onReady) options.onReady(model);
-        }, options.onError);
-      }
-    };
-  </script>
-
-  <script src="game.js"></script>
 </body>
 </html>
