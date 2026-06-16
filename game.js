@@ -39,11 +39,11 @@ scene.fog = new THREE.Fog(0xbfdfff, 80, 300);
 
     document.body.appendChild(renderer.domElement);
 
-    const ambient = new THREE.AmbientLight(0xffffff, 0.5);
+    const ambient = new THREE.AmbientLight(0xffffff, 1.5);
     scene.add(ambient);
 
-    const light = new THREE.DirectionalLight(0xffffff, 1);
-    light.position.set(50, 80, 50);
+    const light = new THREE.DirectionalLight(0xfff2cc, 2);
+    light.position.set(100, 200, 100);
     light.castShadow = true;
     scene.add(light);
 
@@ -62,7 +62,7 @@ scene.fog = new THREE.Fog(0xbfdfff, 80, 300);
 function createGround() {
     const ground = new THREE.Mesh(
         new THREE.PlaneGeometry(WORLD_SIZE, WORLD_SIZE),
-        new THREE.MeshStandardMaterial({ color: 0x2d2d2d })
+        new THREE.MeshStandardMaterial({ color: 0x6dbf4b })
     );
 
     ground.rotation.x = -Math.PI / 2;
@@ -72,11 +72,11 @@ function createGround() {
 
 function createPlayer() {
     player = new THREE.Object3D();
-    player.position.set(0, 2, 0);
+    player.position.set(-55, 2, -40);
     scene.add(player);
 
     player.add(camera);
-    camera.position.set(0, 3, 0);
+    camera.position.set(0, 4, 0);
 }
 
 function createMaze() {
