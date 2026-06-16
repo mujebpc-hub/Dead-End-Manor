@@ -315,7 +315,7 @@ function mouseLook(e) {
     yaw -= e.movementX * 0.002;
     pitch -= e.movementY * 0.002;
 
-    pitch = Math.max(-1.5, Math.min(1.5, pitch));
+    pitch = Math.max(-Math.PI / 2, Math.min(Math.PI / 2, pitch));
 }
 
 window.addEventListener("resize", () => {
