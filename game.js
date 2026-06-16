@@ -22,9 +22,9 @@ let gameOver = false;
 function init() {
     clock = new THREE.Clock();
 
-scene = new THREE.Scene();
-scene.background = new THREE.Color(0x87CEEB);
-scene.fog = new THREE.Fog(0xbfdfff, 80, 300);
+    scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x87CEEB);
+    scene.fog = new THREE.Fog(0xbfdfff, 80, 300);
 
     camera = new THREE.PerspectiveCamera(
         75,
@@ -55,14 +55,14 @@ scene.fog = new THREE.Fog(0xbfdfff, 80, 300);
     window.addEventListener("keydown", keyDown);
     window.addEventListener("keyup", keyUp);
     window.addEventListener("mousemove", mouseLook);
-
-    document.body.requestPointerLock();
 }
 
 function createGround() {
     const ground = new THREE.Mesh(
         new THREE.PlaneGeometry(WORLD_SIZE, WORLD_SIZE),
-        new THREE.MeshStandardMaterial({ color: 0x6dbf4b })
+        new THREE.MeshStandardMaterial({
+            color: 0x6dbf4b
+        })
     );
 
     ground.rotation.x = -Math.PI / 2;
@@ -72,11 +72,20 @@ function createGround() {
 
 function createPlayer() {
     player = new THREE.Object3D();
-    player.position.set(-55, 2, -40);
+
+    player.position.set(-25, 2, -25);
+
     scene.add(player);
 
     player.add(camera);
+
     camera.position.set(0, 4, 0);
+
+    player.rotation.y = Math.PI;
+
+    camera.lookAt(0, 4, -20);
+
+    lastPlayerPos.copy(player.position);
 }
 
 function createMaze() {
@@ -92,7 +101,7 @@ function createMaze() {
         "############"
     ];
 
-    const size = 15;
+    const size = 10;
 
     maze.forEach((row, z) => {
         row.split("").forEach((cell, x) => {
@@ -105,9 +114,9 @@ function createMaze() {
                 );
 
                 wall.position.set(
-                    x * size - 80,
+                    x * size - 40,
                     5,
-                    z * size - 60
+                    z * size - 40
                 );
 
                 wall.castShadow = true;
@@ -134,25 +143,28 @@ function createEnemy() {
         function(gltf) {
             enemy = gltf.scene;
 
-            enemy.scale.set(3, 3, 3);
-            enemy.position.set(50, 0, 50);
-
-            enemy.traverse((child) => {
-                if (child.isMesh) {
-                    child.castShadow = true;
-                    child.receiveShadow = true;
-                }
-            });
-
-            if (gltf.animations.length > 0) {
-                enemyMixer = new THREE.AnimationMixer(enemy);
-
-                gltf.animations.forEach((clip) => {
-                    enemyMixer.clipAction(clip).play();
-                });
-            }
+            enemy.scale.set(2,2,2);
+            enemy.position.set(20,0,20);
 
             scene.add(enemy);
+
+            pickEnemyTarget();
+        },
+
+        undefined,
+
+        function(error){
+            console.log("Enemy model failed:", error);
+
+            enemy = new THREE.Mesh(
+                new THREE.BoxGeometry(3,6,3),
+                new THREE.MeshBasicMaterial({ color:0xff0000 })
+            );
+
+            enemy.position.set(20,3,20);
+
+            scene.add(enemy);
+
             pickEnemyTarget();
         }
     );
@@ -177,17 +189,18 @@ function updatePlayer(delta) {
 
     player.position.addScaledVector(dir, PLAYER_SPEED * delta);
 
-    for(let col of colliders) {
+    for(let col of colliders){
         let dx = player.position.x - col.x;
         let dz = player.position.z - col.z;
+
         let dist = Math.sqrt(dx*dx + dz*dz);
 
-        if(dist < col.r + 2) {
+        if(dist < col.r + 2){
             player.position.copy(oldPos);
         }
     }
 
-    if(player.position.distanceTo(lastPlayerPos) < 0.4) {
+    if(player.position.distanceTo(lastPlayerPos) < 0.4){
         idleTimer += delta;
     } else {
         idleTimer = 0;
@@ -199,35 +212,35 @@ function updatePlayer(delta) {
     camera.rotation.x = pitch;
 }
 
-function updateEnemy(delta) {
+function updateEnemy(delta){
     if(!enemy) return;
 
     let distance = enemy.position.distanceTo(player.position);
 
-    if(distance < 3) {
+    if(distance < 3){
         alert("GAME OVER");
         gameOver = true;
         return;
     }
 
-    if(idleTimer >= 6) {
+    if(idleTimer >= 6){
         enemyState = "chase";
     }
 
-    if(enemyState === "patrol") {
+    if(enemyState === "patrol"){
         patrolEnemy(delta);
     }
 
-    if(enemyState === "chase") {
+    if(enemyState === "chase"){
         chaseEnemy(delta);
     }
 }
 
-function patrolEnemy(delta) {
+function patrolEnemy(delta){
     let dir = new THREE.Vector3()
         .subVectors(enemyTarget, enemy.position);
 
-    if(dir.length() < 2) {
+    if(dir.length() < 2){
         pickEnemyTarget();
         return;
     }
@@ -236,7 +249,7 @@ function patrolEnemy(delta) {
     moveEnemy(dir, delta);
 }
 
-function chaseEnemy(delta) {
+function chaseEnemy(delta){
     let dir = new THREE.Vector3()
         .subVectors(player.position, enemy.position);
 
@@ -244,40 +257,20 @@ function chaseEnemy(delta) {
     moveEnemy(dir, delta);
 }
 
-function moveEnemy(dir, delta) {
-    let nextX = enemy.position.x + dir.x * ENEMY_SPEED * delta;
-    let nextZ = enemy.position.z + dir.z * ENEMY_SPEED * delta;
-
-    let blocked = false;
-
-    for(let col of colliders) {
-        let dx = nextX - col.x;
-        let dz = nextZ - col.z;
-        let dist = Math.sqrt(dx*dx + dz*dz);
-
-        if(dist < col.r + 2) {
-            blocked = true;
-            break;
-        }
-    }
-
-    if(!blocked) {
-        enemy.position.x = nextX;
-        enemy.position.z = nextZ;
-    }
-
-    enemy.lookAt(player.position.x, enemy.position.y, player.position.z);
+function moveEnemy(dir, delta){
+    enemy.position.x += dir.x * ENEMY_SPEED * delta;
+    enemy.position.z += dir.z * ENEMY_SPEED * delta;
 }
 
-function pickEnemyTarget() {
+function pickEnemyTarget(){
     enemyTarget.set(
-        Math.random() * 100 - 50,
+        Math.random()*40 - 20,
         0,
-        Math.random() * 100 - 50
+        Math.random()*40 - 20
     );
 }
 
-function animate() {
+function animate(){
     requestAnimationFrame(animate);
 
     if(gameOver) return;
@@ -285,37 +278,34 @@ function animate() {
     let delta = clock.getDelta();
 
     updatePlayer(delta);
+    updateEnemy(delta);
 
     if(enemyMixer) enemyMixer.update(delta);
-
-    updateEnemy(delta);
 
     renderer.render(scene, camera);
 }
 
-function keyDown(e) {
+function keyDown(e){
     let key = e.key.toLowerCase();
-
-    if(key === "w") move.w = true;
-    if(key === "a") move.a = true;
-    if(key === "s") move.s = true;
-    if(key === "d") move.d = true;
+    if(key==="w") move.w=true;
+    if(key==="a") move.a=true;
+    if(key==="s") move.s=true;
+    if(key==="d") move.d=true;
 }
 
-function keyUp(e) {
+function keyUp(e){
     let key = e.key.toLowerCase();
-
-    if(key === "w") move.w = false;
-    if(key === "a") move.a = false;
-    if(key === "s") move.s = false;
-    if(key === "d") move.d = false;
+    if(key==="w") move.w=false;
+    if(key==="a") move.a=false;
+    if(key==="s") move.s=false;
+    if(key==="d") move.d=false;
 }
 
-function mouseLook(e) {
+function mouseLook(e){
     yaw -= e.movementX * 0.002;
     pitch -= e.movementY * 0.002;
 
-    pitch = Math.max(-Math.PI / 2, Math.min(Math.PI / 2, pitch));
+    pitch = Math.max(-Math.PI/2, Math.min(Math.PI/2, pitch));
 }
 
 window.addEventListener("resize", () => {
