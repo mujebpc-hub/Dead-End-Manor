@@ -1,1532 +1,328 @@
 let scene, camera, renderer, clock;
-let player, torchLight, enemy;
-let gameStarted = false;
-let paused = false;
-let torchOn = false;
-let running = false;
-let health = 100;
-let stamina = 100;
-let battery = 1000;
-let brokenCar;
-let fuelTank;
-let redDiamond;
-let greenDiamond;
-let yellowDiamond;
-let glbTree = null;
-let granny;
-let enemyMixer = null;
-let friends = [];
+let player, enemy, enemyMixer;
 
-let caveGate;
+const WORLD_SIZE = 220;
+const PLAYER_SPEED = 8;
+const ENEMY_SPEED = 4;
 
-const WORLD_WIDTH = 1500;
-const WORLD_DEPTH = 1800;
-const playerHeight = 5;
-const eyeHeight = 1.6;
-const walkSpeed = 10;
-const runSpeed = 16;
-const mouseSensitivity = 0.002;
+let move = { w:false, a:false, s:false, d:false };
+let colliders = [];
 
 let yaw = 0;
 let pitch = 0;
-let velocityY = 0;
-let isJumping = false;
-let lastSafePosition = new THREE.Vector3();
 
-let move = { w: false, a: false, s: false, d: false };
-let joystick = { active: false, dx: 0, dy: 0 };
-let sit = { c: false, dx: 0, dy: 0};
+let idleTimer = 0;
+let lastPlayerPos = new THREE.Vector3();
 
-let colliders = [];
 let enemyState = "patrol";
 let enemyTarget = new THREE.Vector3();
-let enemyPauseTimer = 0;
-let jumpscareStarted = false;
 
-// ✅ INVENTORY SYSTEM
-let inventory = {
-  key: false,
-  batteries: 0,
-  notes: [],
-  notesCollected: 0
-};
+let gameOver = false;
 
-// ✅ OBJECTIVE SYSTEM
-let currentObjective = "Find the Mansion Key";
-let objectiveStage = 0; // 0: Key, 1: Mansion, 2: Unlock, 3: Escape
-
-// ✅ SOUND SYSTEM (Web Audio API)
-let audioContext;
-let soundLibrary = {};
-let activeSounds = {};
-
-// ✅ DANGER SYSTEM
-let dangerLevel = 0; // 0-3: none, low, high, critical
-let lastPlayerSound = { time: 0, type: "none" }; // Last sound enemy heard
-let enemyInvestigating = false;
-let investigateTarget = new THREE.Vector3();
-let investigateTimer = 0;
-
-// ✅ MANSION ENTRY
-let mansionDoor = null;
-let doorUnlocked = false;
-let doorOpen = false;
-let escapePoint = new THREE.Vector3(0, 0, 500);
-let mansionInterior = null;
-
-// ✅ KEY & ITEMS
-let keyPickup = null;
-let notesInWorld = [];
-
-// ✅ HORROR EVENTS
-let horrorEventTimer = 0;
-let lastHorrorEvent = 0;
-let shadowFigure = null;
-
-// ✅ MARKERS & INDICATORS
-let keyMarker = null;
-let mansionMarker = null;
-let escapeMarker = null;
-let listenersAdded = false;
-let mobileControlsCreated = false;
-
-function getEl(id) {
-  return document.getElementById(id);
-}
-
-function showEl(id, display = "block") {
-  const el = getEl(id);
-  if (el) el.style.display = display;
-}
-
-var GLB = window.GLB || {
-  // pura GLB manager code yahan
-
-  models/enemy 3 rod advanced.glb
-
-};
-
-window.GLB = GLB;
-window.GLTFLoader = window.GLTFLoader || THREE.GLTFLoader;
-const GLTFLoader = window.GLTFLoader;
-
-const MODEL_PATHS = {
-  granny: "models/enemy 3 rod advanced.glb",
-  tree: "models/psx_tree.glb"
-};
-
-const MODEL_SCALE = {
-  granny: 2,
-  tree: 3
-};
-
-let treeTemplate = null;
-let treeLoadingPromise = null;
-
-function createGLTFLoader() {
-  const Loader = window.GLTFLoader || THREE.GLTFLoader;
-  if (!Loader) {
-    throw new Error("GLTFLoader missing. Add GLTFLoader before this game script.");
-  }
-  return new Loader();
-}
-
-function loadGLB(path) {
-  return new Promise((resolve, reject) => {
-    createGLTFLoader().load(path, resolve, undefined, reject);
-  });
-}
-
-function enableModelShadows(root) {
-  root.traverse((child) => {
-    if (child.isMesh) {
-      child.castShadow = true;
-      child.receiveShadow = true;
-      if (child.material) child.material.needsUpdate = true;
-    }
-  });
-}
-
-function cloneModel(root) {
-  if (THREE.SkeletonUtils && THREE.SkeletonUtils.clone) {
-    return THREE.SkeletonUtils.clone(root);
-  }
-  return root.clone(true);
-}
-
-function loadTreeTemplate() {
-  if (treeLoadingPromise) return treeLoadingPromise;
-
-  treeLoadingPromise = loadGLB(MODEL_PATHS.tree).then((gltf) => {
-    treeTemplate = gltf.scene;
-    enableModelShadows(treeTemplate);
-    console.log("TREE MODEL LOADED", MODEL_PATHS.tree);
-    return treeTemplate;
-  });
-
-  return treeLoadingPromise;
-}
-
-/* ================= END SAFE GLB MANAGER SYSTEM ================= */
-
-function startGame() {
-  showEl("home", "none");
-  showEl("loading", "flex");
-
-  setTimeout(() => {
-    showEl("loading", "none");
-    showEl("menu", "flex");
-  }, 1500);
-}
-
-function enterGame() {
-  showEl("menu", "none");
-  showEl("gameUI", "block");
-  showEl("gameOver", "none");
-  showEl("victory", "none");
-
-  if (!gameStarted) {
-    gameStarted = true;
-    initAudioContext();
-    init();
-    animate();
-  }
-
-  if (audioContext && audioContext.state === "suspended") {
-    audioContext.resume();
-  }
-
-  requestPointerControl();
-}
-
-// ✅ SOUND SYSTEM INIT
-function initAudioContext() {
-  const AudioCtor = window.AudioContext || window.webkitAudioContext;
-  if (!audioContext && AudioCtor) {
-    audioContext = new AudioCtor();
-  }
-}
-
-// ✅ CREATE SOUND WITH WEB AUDIO API
-function createSound(name, frequency, duration, type = "sine") {
-  if (!audioContext) return;
-
-  const osc = audioContext.createOscillator();
-  const gain = audioContext.createGain();
-  
-  osc.connect(gain);
-  gain.connect(audioContext.destination);
-  
-  osc.frequency.value = frequency;
-  osc.type = type;
-  
-  gain.gain.setValueAtTime(0.1, audioContext.currentTime);
-  gain.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + duration);
-  
-  osc.start(audioContext.currentTime);
-  osc.stop(audioContext.currentTime + duration);
-}
-
-// ✅ PLAY SOUNDS - EXPANDED
-function playSound(soundName) {
-  if (!audioContext) return;
-
-  switch(soundName) {
-    case "heartbeat":
-      createSound("heartbeat", 60, 0.3, "sine");
-      break;
-    case "chase_music":
-      createSound("chase", 150, 0.5, "square");
-      break;
-    case "jumpscare":
-      createSound("jumpscare", 200, 0.8, "sine");
-      createSound("jumpscare2", 300, 0.8, "square");
-      break;
-    case "footstep":
-      createSound("footstep", 100, 0.15, "sine");
-      break;
-    case "key_pickup":
-      createSound("pickup", 800, 0.3, "sine");
-      createSound("pickup2", 1000, 0.3, "sine");
-      break;
-    case "door_open":
-      createSound("door", 200, 0.5, "sine");
-      break;
-    case "ghost_whisper":
-      createSound("whisper", 120, 0.4, "sine");
-      break;
-    // ✅ NEW HORROR SOUNDS
-    case "distant_scream":
-      createSound("scream", 180, 1.2, "sine");
-      break;
-    case "wind":
-      createSound("wind", 80, 2, "sine");
-      break;
-    case "tree_creak":
-      createSound("creak", 140, 0.8, "sine");
-      break;
-  }
-}
-
-// ✅ PLAY RANDOM HORROR SOUNDS
-function playRandomHorrorSound() {
-  const sounds = ["ghost_whisper", "distant_scream", "wind", "tree_creak"];
-  const randomSound = sounds[Math.floor(Math.random() * sounds.length)];
-  playSound(randomSound);
-}
+init();
+animate();
 
 function init() {
-  clock = new THREE.Clock();
-  scene = new THREE.Scene();
-  
-  // ✅ DARK BLUE-BLACK SKY FOR MOONLIT NIGHT
-  scene.background = new THREE.Color(0x0a0f1f);
-  scene.fog = new THREE.Fog(0x1a2a4a, 80, 350); // ✅ Denser fog with blue tint
-  
-  // ✅ ADD STARS TO SKY
-  createStars();
+    clock = new THREE.Clock();
 
-  camera = new THREE.PerspectiveCamera(
-    75,
-    window.innerWidth / window.innerHeight,
-    0.1,
-    1200
-  );
+    scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x111111);
+    scene.fog = new THREE.Fog(0x111111, 20, 180);
 
-  renderer = new THREE.WebGLRenderer({ antialias: true });
-  renderer.setPixelRatio(window.devicePixelRatio);
-  renderer.setSize(window.innerWidth, window.innerHeight);
-  renderer.shadowMap.enabled = true;
-  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-  renderer.toneMapping = THREE.ACESFilmicToneMapping;
-  renderer.toneMappingExposure = 1.0;
-  document.body.appendChild(renderer.domElement);
+    camera = new THREE.PerspectiveCamera(
+        75,
+        window.innerWidth / window.innerHeight,
+        0.1,
+        1000
+    );
 
-  // ✅ ENHANCED MOONLIGHT - BLUISH AMBIENT
-  scene.add(new THREE.AmbientLight(0x4a5f8f, 0.4));
+    renderer = new THREE.WebGLRenderer({ antialias:true });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.shadowMap.enabled = true;
 
-  // ✅ MOON DIRECTIONAL LIGHT - BRIGHT MOONLIGHT
-  const moon = new THREE.DirectionalLight(0xc8deff, 1.4);
-  moon.position.set(-200, 280, 150);
-  moon.castShadow = true;
-  moon.shadow.mapSize.set(4096, 4096);
-  moon.shadow.camera.near = 0.5;
-  moon.shadow.camera.far = 600;
-  moon.shadow.camera.left = -400;
-  moon.shadow.camera.right = 400;
-  moon.shadow.camera.top = 400;
-  moon.shadow.camera.bottom = -400;
-  scene.add(moon);
+    document.body.appendChild(renderer.domElement);
 
-  // ✅ VISUAL MOON IN SKY
-  const moonGeometry = new THREE.SphereGeometry(50, 32, 32);
-  const moonMaterial = new THREE.MeshBasicMaterial({ color: 0xf0f8ff });
-  const moonMesh = new THREE.Mesh(moonGeometry, moonMaterial);
-  moonMesh.position.set(-200, 500, -500);
-  scene.add(moonMesh);
+    const ambient = new THREE.AmbientLight(0xffffff, 0.5);
+    scene.add(ambient);
 
-  // ✅ MOON GLOW
-  const glowGeometry = new THREE.SphereGeometry(60, 32, 32);
-  const glowMaterial = new THREE.MeshBasicMaterial({
-    color: 0xb8d5ff,
-    transparent: true,
-    opacity: 0.1
-  });
-  const moonGlow = new THREE.Mesh(glowGeometry, glowMaterial);
-  moonGlow.position.copy(moonMesh.position);
-  scene.add(moonGlow);
+    const light = new THREE.DirectionalLight(0xffffff, 1);
+    light.position.set(50, 80, 50);
+    light.castShadow = true;
+    scene.add(light);
 
-  createWorld();
+    createGround();
+    createMaze();
+    createPlayer();
+    createEnemy();
 
-  player = new THREE.Object3D();
-  player.position.set(0, getTerrainHeight(0, 20) + playerHeight, 20);
-  lastSafePosition.copy(player.position);
-  scene.add(player);
-
-  player.add(camera);
-  camera.position.set(0, eyeHeight, 0);
-  camera.rotation.order = "YXZ";
-
-  // ✅ ENHANCED TORCH - NO BATTERY DRAIN, VERY POWERFUL
-  torchLight = new THREE.SpotLight(0xffffff, 0, 200, Math.PI / 4.5, 0.5, 2);
-  torchLight.shadow.mapSize.set(2048, 2048);
-  torchLight.shadow.camera.near = 0.1;
-  torchLight.shadow.camera.far = 200;
-  camera.add(torchLight);
-  camera.add(torchLight.target);
-  torchLight.target.position.set(0, 0, -1);
-  torchOn = true; // ✅ TORCH STARTS ON
-
-  if (!listenersAdded) {
     window.addEventListener("keydown", keyDown);
     window.addEventListener("keyup", keyUp);
-    document.addEventListener("click", requestPointerControl);
-    document.addEventListener("mousemove", handleMouseLook);
-    document.addEventListener("pointerlockchange", handlePointerLockChange);
-    window.addEventListener("resize", onResize);
-    listenersAdded = true;
-  }
+    window.addEventListener("mousemove", mouseLook);
 
-  setupMobileUiButtons();
-  createMobileControls();
-  updateHealthUI();
-  updateStaminaUI();
-  updateBatteryUI();
-  updateObjectiveUI();
-  updateInventoryUI();
-
-  // ✅ SET INITIAL TORCH STATE
-  if (torchLight) torchLight.intensity = 9;
+    document.body.requestPointerLock();
 }
 
-// ✅ CREATE STARS IN SKY
-function createStars() {
-  const starsGeometry = new THREE.BufferGeometry();
-  const starsMaterial = new THREE.PointsMaterial({
-    color: 0xffffff,
-    size: 2,
-    transparent: true,
-    opacity: 0.8
-  });
+function createGround() {
+    const ground = new THREE.Mesh(
+        new THREE.PlaneGeometry(WORLD_SIZE, WORLD_SIZE),
+        new THREE.MeshStandardMaterial({ color: 0x2d2d2d })
+    );
 
-  const starsVertices = [];
-  for (let i = 0; i < 200; i++) {
-    const x = (Math.random() - 0.5) * 2000;
-    const y = Math.random() * 800 + 300;
-    const z = (Math.random() - 0.5) * 2000;
-    starsVertices.push(x, y, z);
-  }
-
-  starsGeometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array(starsVertices), 3));
-  const stars = new THREE.Points(starsGeometry, starsMaterial);
-  scene.add(stars);
+    ground.rotation.x = -Math.PI / 2;
+    ground.receiveShadow = true;
+    scene.add(ground);
 }
 
-function createWorld() {
-  createTerrain();
-  createMansion();
-  createForest();
-  createRocks();
-  createGranny();
-  createKey();
-  createNotes();
-  createShadowFigure();
+function createPlayer() {
+    player = new THREE.Object3D();
+    player.position.set(0, 2, 0);
+    scene.add(player);
 
-  // createBrokenCar();  
+    player.add(camera);
+    camera.position.set(0, 3, 0);
 }
 
-function getTerrainHeight(x, z) {
-  return (
-    Math.sin(x * 0.012) * 3 +
-    Math.cos(z * 0.01) * 4 +
-    Math.sin((x + z) * 0.006) * 5
-  );
-}
+function createMaze() {
+    const maze = [
+        "############",
+        "#     #    #",
+        "# ### # ## #",
+        "# #   #    #",
+        "# # ###### #",
+        "# #        #",
+        "# #######  #",
+        "#          #",
+        "############"
+    ];
 
-function createTerrain() {
-  const loader = new THREE.TextureLoader();
-  const grass = loader.load("textures/grass.jpg");
-  grass.wrapS = THREE.RepeatWrapping;
-  grass.wrapT = THREE.RepeatWrapping;
-  grass.repeat.set(90, 110);
+    const size = 15;
 
-  const geometry = new THREE.PlaneGeometry(WORLD_WIDTH, WORLD_DEPTH, 140, 160);
-  geometry.rotateX(-Math.PI / 2);
+    maze.forEach((row, z) => {
+        row.split("").forEach((cell, x) => {
+            if (cell === "#") {
+                const wall = new THREE.Mesh(
+                    new THREE.BoxGeometry(size, 10, size),
+                    new THREE.MeshStandardMaterial({
+                        color: 0x555555
+                    })
+                );
 
-  const pos = geometry.attributes.position;
-  for (let i = 0; i < pos.count; i++) {
-    const x = pos.getX(i);
-    const z = pos.getZ(i);
-    pos.setY(i, getTerrainHeight(x, z));
-  }
+                wall.position.set(
+                    x * size - 80,
+                    5,
+                    z * size - 60
+                );
 
-  geometry.computeVertexNormals();
+                wall.castShadow = true;
+                wall.receiveShadow = true;
 
-  const ground = new THREE.Mesh(
-    geometry,
-    new THREE.MeshStandardMaterial({ map: grass, roughness: 1 })
-  );
-  ground.receiveShadow = true;
-  scene.add(ground);
+                scene.add(wall);
 
-  const road = new THREE.Mesh(
-  new THREE.BoxGeometry(12, 0.15, 220),
-  new THREE.MeshStandardMaterial({ color: 0x343434 })
-);
-
-road.position.set(
-  0,
-  getTerrainHeight(0, -110) + 0.05,
-  -110
-);
-
-road.castShadow = true;
-road.receiveShadow = true;
-
-scene.add(road);
-
-}
-  
-function createMansion() {
-  const mansion = new THREE.Mesh(
-    new THREE.BoxGeometry(70, 32, 60),
-    new THREE.MeshStandardMaterial({ color: 0xb8b8b8, roughness: 0.9 })
-  );
-  mansion.position.set(0, getTerrainHeight(0, -420) + 16, -420);
-  mansion.castShadow = true;
-  mansion.receiveShadow = true;
-  scene.add(mansion);
-  addBoxCollider(mansion);
-
-  // ✅ MANSION DOOR WITH ANIMATION
-  mansionDoor = new THREE.Mesh(
-    new THREE.BoxGeometry(9, 15, 1.5),
-    new THREE.MeshStandardMaterial({ color: 0x151515 })
-  );
-  mansionDoor.position.set(0, getTerrainHeight(0, -389) + 7.5, -389);
-  mansionDoor.userData.type = "door";
-  mansionDoor.userData.originalRotation = 0;
-  scene.add(mansionDoor);
-  addBoxCollider(mansionDoor);
-
-  const tower = new THREE.Mesh(
-    new THREE.BoxGeometry(22, 48, 22),
-    new THREE.MeshStandardMaterial({ color: 0x999999 })
-  );
-  tower.position.set(-35, getTerrainHeight(-35, -420) + 24, -420);
-  tower.castShadow = true;
-  scene.add(tower);
-  addBoxCollider(tower);
-
-  // ✅ MANSION INTERIOR (BASEMENT/ROOMS)
-  createMansionInterior(mansion.position);
-}
-
-// ✅ CREATE MANSION INTERIOR
-function createMansionInterior(mansionPos) {
-  mansionInterior = new THREE.Group();
-  
-  // Interior rooms below mansion
-  const room1 = new THREE.Mesh(
-    new THREE.BoxGeometry(20, 10, 20),
-    new THREE.MeshStandardMaterial({ color: 0x2a2a2a })
-  );
-  room1.position.set(mansionPos.x - 15, mansionPos.y - 20, mansionPos.z);
-  scene.add(room1);
-
-  const room2 = new THREE.Mesh(
-    new THREE.BoxGeometry(20, 10, 20),
-    new THREE.MeshStandardMaterial({ color: 0x3a3a3a })
-  );
-  room2.position.set(mansionPos.x + 15, mansionPos.y - 20, mansionPos.z);
-  scene.add(room2);
-}
-
-function createTree(x, z) {
-  const groundY = getTerrainHeight(x, z);
-
-  if (!treeTemplate) return;
-
-  const tree = cloneModel(treeTemplate);
-  tree.scale.setScalar(MODEL_SCALE.tree * (0.85 + Math.random() * 0.3));
-  tree.position.set(x, groundY, z);
-  tree.rotation.y = Math.random() * Math.PI * 2;
-  enableModelShadows(tree);
-
-  scene.add(tree);
-  addCylinderCollider(x, z, 2.8);
-}
-
-function createForest() {
-  const treePositions = [];
-
-  for (let i = 0; i < 360; i++) {
-    const x = Math.random() * WORLD_WIDTH - WORLD_WIDTH / 2;
-    const z = Math.random() * WORLD_DEPTH - WORLD_DEPTH / 2;
-
-    if (Math.abs(x) < 85 && z > -500 && z < -340) continue;
-    if (Math.abs(x) < 25 && z > -360 && z < 120) continue;
-
-    treePositions.push({ x, z });
-  }
-
-  loadTreeTemplate()
-    .then(() => {
-      treePositions.forEach(({ x, z }) => createTree(x, z));
-    })
-    .catch((error) => {
-      console.error("TREE MODEL ERROR", MODEL_PATHS.tree, error);
+                colliders.push({
+                    x: wall.position.x,
+                    z: wall.position.z,
+                    r: size / 2
+                });
+            }
+        });
     });
 }
 
-function createGLBTestTree() {
+function createEnemy() {
+    const loader = new THREE.GLTFLoader();
 
-  console.log("TRYING TO LOAD GLB: models/psx_tree.glb");
-  
- const loader = createGLTFLoader();
+    loader.load(
+        "models/granny enemy 1.glb",
 
-  console.log("GLB loading started...");
+        function(gltf) {
+            enemy = gltf.scene;
 
-  loader.load(
-    MODEL_PATHS.tree,
+            enemy.scale.set(3, 3, 3);
+            enemy.position.set(50, 0, 50);
 
-    function (gltf) {
-      glbTree = gltf.scene;
+            enemy.traverse((child) => {
+                if (child.isMesh) {
+                    child.castShadow = true;
+                    child.receiveShadow = true;
+                }
+            });
 
-      glbTree.scale.set(2, 2, 2);
+            if (gltf.animations.length > 0) {
+                enemyMixer = new THREE.AnimationMixer(enemy);
 
-      const x = 0;
-      const z = 0;
-      const y = getTerrainHeight(x, z);
+                gltf.animations.forEach((clip) => {
+                    enemyMixer.clipAction(clip).play();
+                });
+            }
 
-      glbTree.position.set(x, y, z);
-
-      glbTree.traverse((child) => {
-        if (child.isMesh) {
-          child.castShadow = true;
-          child.receiveShadow = true;
+            scene.add(enemy);
+            pickEnemyTarget();
         }
-      });
-
-      console.log("GLB before adding to scene");
-
-      scene.add(glbTree);
-
-      console.log("GLB TREE LOADED ✅");
-    },
-
-    undefined,
-
-    function (error) {
-      console.error("GLB TREE ERROR ❌", error);
-    }
-  );
-}
-
-function createRocks() {
-  for (let i = 0; i < 120; i++) {
-    const x = Math.random() * WORLD_WIDTH - WORLD_WIDTH / 2;
-    const z = Math.random() * WORLD_DEPTH - WORLD_DEPTH / 2;
-    const size = Math.random() * 3.5 + 1.3;
-
-    const rock = new THREE.Mesh(
-      new THREE.DodecahedronGeometry(size),
-      new THREE.MeshStandardMaterial({ color: 0x626262, roughness: 1 })
     );
-    rock.position.set(x, getTerrainHeight(x, z) + size * 0.7, z);
-    rock.rotation.set(Math.random(), Math.random(), Math.random());
-    rock.castShadow = true;
-    rock.receiveShadow = true;
-    scene.add(rock);
-    addCylinderCollider(x, z, size + 1);
-  }
-}
-
-// ✅ CREATE SHADOW FIGURE (Horror event)
-function createShadowFigure() {
-  shadowFigure = new THREE.Group();
-  
-  const body = new THREE.Mesh(
-    new THREE.CylinderGeometry(1, 1.5, 6, 8),
-    new THREE.MeshStandardMaterial({
-      color: 0x1a1a1a,
-      transparent: true,
-      opacity: 0.3
-    })
-  );
-  body.position.y = 3;
-  shadowFigure.add(body);
-
-  const head = new THREE.Mesh(
-    new THREE.SphereGeometry(1, 8, 8),
-    new THREE.MeshStandardMaterial({
-      color: 0x0a0a0a,
-      transparent: true,
-      opacity: 0.3
-    })
-  );
-  head.position.y = 7;
-  shadowFigure.add(head);
-
-  shadowFigure.position.set(0, getTerrainHeight(0, -200), -200);
-  shadowFigure.userData.visible = false;
-  scene.add(shadowFigure);
-}
-
-// ✅ CREATE KEY PICKUP
-function createKey() {
-  const keyGeometry = new THREE.BoxGeometry(0.8, 1.5, 0.2);
-  const keyMaterial = new THREE.MeshStandardMaterial({ color: 0xffd700, metalness: 0.8 });
-  
-  keyPickup = new THREE.Mesh(keyGeometry, keyMaterial);
-  keyPickup.position.set(50, getTerrainHeight(50, 100) + 2, 100);
-  keyPickup.castShadow = true;
-  keyPickup.userData.type = "key";
-  scene.add(keyPickup);
-}
-
-// ✅ CREATE NOTES IN WORLD
-function createNotes() {
-  const noteTexts = [
-    "HELP... TRAPPED HERE",
-    "DON'T GO OUT AT NIGHT",
-    "IT WATCHES... ALWAYS",
-    "THE KEY IS HIDDEN"
-  ];
-
-  for (let i = 0; i < 3; i++) {
-    const x = Math.random() * 200 - 100;
-    const z = Math.random() * 200 - 100;
-    const notePos = new THREE.Vector3(
-      x,
-      getTerrainHeight(x, z) + 1,
-      z
-    );
-
-    const noteGeometry = new THREE.BoxGeometry(1, 1.5, 0.1);
-    const noteMaterial = new THREE.MeshStandardMaterial({ color: 0xd4a574 });
-    const note = new THREE.Mesh(noteGeometry, noteMaterial);
-    
-    note.position.copy(notePos);
-    note.userData.type = "note";
-    note.userData.text = noteTexts[i];
-    scene.add(note);
-    notesInWorld.push(note);
-  }
-}
-
-function createGranny() {
-
-  const loader = createGLTFLoader();
-
-  loader.load(
-    MODEL_PATHS.granny,
-
-    function (gltf) {
-
-      granny = gltf.scene;
-      enemy = granny;
-
-      granny.scale.setScalar(MODEL_SCALE.granny);
-
-      const x = 80;
-      const z = -250;
-      const y = getTerrainHeight(x, z);
-
-      granny.position.set(x, y, z);
-      granny.userData.lastKnownPlayerPos = new THREE.Vector3();
-
-      enableModelShadows(granny);
-
-      if (gltf.animations && gltf.animations.length > 0) {
-        enemyMixer = new THREE.AnimationMixer(granny);
-        gltf.animations.forEach((clip) => {
-          enemyMixer.clipAction(clip).play();
-        });
-      }
-
-      scene.add(granny);
-      pickEnemyPatrolTarget();
-
-      console.log("GRANNY LOADED ✅");
-
-    },
-
-    undefined,
-
-    function (error) {
-      console.error("GRANNY ERROR ❌", error);
-    }
-  );
-}
-
-function detectPlayer() {
-  if (!enemy || !player) return false;
-
-  const distance = enemy.position.distanceTo(player.position);
-  
-  // ✅ CLOSE DETECTION
-  if (distance < 50) return true;
-
-  // ✅ VISION CONE - IMPROVED
-  const toPlayer = new THREE.Vector3().subVectors(player.position, enemy.position);
-  toPlayer.y = 0;
-
-  if (toPlayer.length() < 100) {
-    toPlayer.normalize();
-    const enemyForward = new THREE.Vector3(0, 0, -1).applyQuaternion(enemy.quaternion);
-    enemyForward.y = 0;
-    enemyForward.normalize();
-
-    if (enemyForward.dot(toPlayer) > 0.4) return true;
-  }
-
-  // ✅ SOUND DETECTION - IMPROVED
-  if (lastPlayerSound.type === "footstep" && distance < 60) return true;
-  if (lastPlayerSound.type === "run" && distance < 80) return true;
-  if (lastPlayerSound.type === "jump" && distance < 70) return true;
-
-  return false;
-}
-
-// ✅ SMARTER ENEMY AI
-function updateEnemyAI(delta) {
-  if (!enemy || jumpscareStarted) return;
-
-  const distance = enemy.position.distanceTo(player.position);
-
-  // ✅ KILL CHECK
-  if (distance < 3) {
-    triggerJumpscare();
-    return;
-  }
-
-  // ✅ DETECTION FLOW
-  if (enemyState !== "chase" && detectPlayer()) {
-    enemyState = "chase";
-    playSound("chase_music");
-  }
-
-  // ✅ CHASE TO INVESTIGATE - SMARTER
-  if (enemyState === "chase" && distance > 120) {
-    enemyState = "investigate";
-    enemy.userData.lastKnownPlayerPos.copy(player.position);
-    enemyInvestigating = true;
-    investigateTimer = 8;
-  }
-
-  // ✅ INVESTIGATE TO PATROL
-  if (enemyState === "investigate" && investigateTimer <= 0) {
-    enemyState = "patrol";
-    enemyInvestigating = false;
-    pickEnemyPatrolTarget();
-  }
-
-  // ✅ INVESTIGATE TIMER
-  if (enemyInvestigating) {
-    investigateTimer -= delta;
-  }
-
-  // ✅ STATES
-  if (enemyState === "patrol") patrolEnemy(delta);
-  if (enemyState === "investigate") investigateEnemy(delta);
-  if (enemyState === "chase") chasePlayer(delta);
-
-  enemy.position.y = getTerrainHeight(enemy.position.x, enemy.position.z);
-  updateDangerLevel(distance);
-
-  // ✅ RANDOM FAKE SOUNDS INVESTIGATION
-  if (Math.random() < 0.001 && enemyState === "patrol") {
-    playRandomHorrorSound();
-  }
-}
-
-// ✅ SMARTER INVESTIGATE STATE
-function investigateEnemy(delta) {
-  const investigatePos = enemy.userData.lastKnownPlayerPos;
-  const dist = enemy.position.distanceTo(investigatePos);
-
-  if (dist < 12) {
-    if (Math.random() > 0.7) {
-      pickEnemyPatrolTarget();
-      enemyState = "patrol";
-      enemyInvestigating = false;
-    }
-    return;
-  }
-
-  const dir = new THREE.Vector3().subVectors(investigatePos, enemy.position);
-  dir.y = 0;
-  dir.normalize();
-
-  enemy.position.addScaledVector(dir, 7 * delta);
-  enemy.lookAt(investigatePos.x, enemy.position.y, investigatePos.z);
-  avoidEnemyHardClip();
-}
-
-function patrolEnemy(delta) {
-  enemyPauseTimer -= delta;
-  if (enemyPauseTimer > 0) return;
-
-  const dir = new THREE.Vector3().subVectors(enemyTarget, enemy.position);
-  dir.y = 0;
-
-  if (dir.length() < 8) {
-    enemyPauseTimer = 2 + Math.random() * 3;
-    pickEnemyPatrolTarget();
-    return;
-  }
-
-  dir.normalize();
-  enemy.position.addScaledVector(dir, 5 * delta);
-  enemy.lookAt(enemy.position.x + dir.x, enemy.position.y, enemy.position.z + dir.z);
-  avoidEnemyHardClip();
-}
-
-function chasePlayer(delta) {
-  const dir = new THREE.Vector3().subVectors(player.position, enemy.position);
-  dir.y = 0;
-  dir.normalize();
-
-  enemy.position.addScaledVector(dir, 11 * delta);
-  enemy.lookAt(player.position.x, enemy.position.y, player.position.z);
-  avoidEnemyHardClip();
-}
-
-function pickEnemyPatrolTarget() {
-  enemyTarget.set(
-    Math.random() * WORLD_WIDTH - WORLD_WIDTH / 2,
-    0,
-    Math.random() * WORLD_DEPTH - WORLD_DEPTH / 2
-  );
-  enemyTarget.y = getTerrainHeight(enemyTarget.x, enemyTarget.z);
-}
-
-// ✅ DANGER LEVEL SYSTEM
-function updateDangerLevel(distance) {
-  if (distance < 8) {
-    dangerLevel = 3;
-    if (Math.random() > 0.7) playSound("heartbeat");
-    applyDangerUI("critical");
-  } else if (distance < 15) {
-    dangerLevel = 2;
-    if (Math.random() > 0.85) playSound("heartbeat");
-    applyDangerUI("high");
-  } else if (distance < 30) {
-    dangerLevel = 1;
-    applyDangerUI("medium");
-  } else {
-    dangerLevel = 0;
-    applyDangerUI("none");
-  }
-}
-
-// ✅ DANGER UI APPLICATION
-function applyDangerUI(level) {
-  const gameUI = getEl("gameUI");
-  if (!gameUI) return;
-  
-  gameUI.classList.remove("enemy-near", "danger-shake");
-  
-  if (level === "high" || level === "critical") {
-    gameUI.classList.add("enemy-near");
-  }
-  if (level === "critical") {
-    gameUI.classList.add("danger-shake");
-  }
-}
-
-// ✅ HORROR EVENTS
-function updateHorrorEvents(delta) {
-  horrorEventTimer -= delta;
-
-  if (horrorEventTimer <= 0) {
-    const eventType = Math.floor(Math.random() * 4);
-
-    if (eventType === 0 && shadowFigure && !shadowFigure.userData.visible) {
-      // Shadow figure appears in distance
-      shadowFigure.userData.visible = true;
-      shadowFigure.position.set(
-        Math.random() * 300 - 150,
-        getTerrainHeight(0, -200),
-        -200 + Math.random() * 150
-      );
-      setTimeout(() => {
-        shadowFigure.userData.visible = false;
-      }, 3000);
-    } else if (eventType === 1) {
-      // Whisper near player
-      playSound("ghost_whisper");
-    } else if (eventType === 2) {
-      // Light flicker
-      if (torchOn && Math.random() > 0.5) {
-        torchLight.intensity = 3;
-        setTimeout(() => {
-          torchLight.intensity = 9;
-        }, 200);
-      }
-    } else if (eventType === 3) {
-      // Random horror sound
-      playRandomHorrorSound();
-    }
-
-    horrorEventTimer = 15 + Math.random() * 20;
-  }
 }
 
 function updatePlayer(delta) {
-  player.rotation.y = yaw;
-  camera.rotation.x = pitch;
+    let dir = new THREE.Vector3();
 
-  lastSafePosition.copy(player.position);
+    if(move.w) dir.z -= 1;
+    if(move.s) dir.z += 1;
+    if(move.a) dir.x -= 1;
+    if(move.d) dir.x += 1;
 
-  const currentSpeed = running ? runSpeed : walkSpeed;
-  const forward = new THREE.Vector3(0, 0, -1).applyAxisAngle(
-    new THREE.Vector3(0, 1, 0),
-    yaw
-  );
-  const right = new THREE.Vector3(1, 0, 0).applyAxisAngle(
-    new THREE.Vector3(0, 1, 0),
-    yaw
-  );
-  const direction = new THREE.Vector3();
+    dir.normalize();
 
-  if (move.w) direction.add(forward);
-  if (move.s) direction.sub(forward);
-  if (move.d) direction.add(right);
-  if (move.a) direction.sub(right);
+    dir.applyAxisAngle(
+        new THREE.Vector3(0,1,0),
+        yaw
+    );
 
-  if (joystick.active) {
-    const joyX = THREE.MathUtils.clamp(joystick.dx / 60, -1, 1);
-    const joyY = THREE.MathUtils.clamp(joystick.dy / 60, -1, 1);
-    direction.addScaledVector(right, joyX);
-    direction.addScaledVector(forward, -joyY);
-  }
+    let oldPos = player.position.clone();
 
-  // ✅ STAMINA - MUCH SLOWER DRAIN (can run 30+ seconds)
-  if (running && direction.lengthSq() > 0) {
-    stamina = Math.max(0, stamina - 0.08); // ✅ Very slow drain
-    if (stamina <= 0) running = false;
-    if (Math.random() > 0.8) playSound("footstep");
-  } else {
-    stamina = Math.min(100, stamina + 0.3); // ✅ Fast recovery
-  }
+    player.position.addScaledVector(dir, PLAYER_SPEED * delta);
 
-  if (direction.lengthSq() > 0) {
-    direction.normalize();
-    player.position.x += direction.x * currentSpeed * delta;
-    player.position.z += direction.z * currentSpeed * delta;
-    
-    // ✅ SOUND TRIGGER
-    if (running) {
-      lastPlayerSound = { time: Date.now(), type: "run" };
-    } else if (direction.lengthSq() > 0) {
-      lastPlayerSound = { time: Date.now(), type: "footstep" };
-    }
-  }
+    for(let col of colliders) {
+        let dx = player.position.x - col.x;
+        let dz = player.position.z - col.z;
+        let dist = Math.sqrt(dx*dx + dz*dz);
 
-  const limitX = WORLD_WIDTH / 2 - 10;
-  const limitZ = WORLD_DEPTH / 2 - 10;
-  player.position.x = THREE.MathUtils.clamp(player.position.x, -limitX, limitX);
-  player.position.z = THREE.MathUtils.clamp(player.position.z, -limitZ, limitZ);
-
-  handleCollisions();
-  checkInteractions();
-}
-
-// ✅ INTERACTION CHECK - IMPROVED
-function checkInteractions() {
-  const interactionRange = 5;
-  const interactionText = getEl("interactionText");
-  if (!interactionText) return;
-
-  let nearItem = false;
-
-  // ✅ CHECK KEY
-  if (keyPickup && !inventory.key) {
-    const keyDist = player.position.distanceTo(keyPickup.position);
-    if (keyDist < interactionRange) {
-      interactionText.style.display = "block";
-      interactionText.innerText = "Press E to Pick Up Key";
-      nearItem = true;
-    }
-  }
-
-  // ✅ CHECK DOOR
-  if (mansionDoor && inventory.key && !doorUnlocked) {
-    const doorDist = player.position.distanceTo(mansionDoor.position);
-    if (doorDist < interactionRange) {
-      interactionText.style.display = "block";
-      interactionText.innerText = "Press E to Unlock Door";
-      nearItem = true;
-    }
-  }
-
-  // ✅ CHECK NOTES
-  for (let note of notesInWorld) {
-    const noteDist = player.position.distanceTo(note.position);
-    if (noteDist < interactionRange) {
-      interactionText.style.display = "block";
-      interactionText.innerText = "Press E to Read Note";
-      nearItem = true;
-      break;
-    }
-  }
-
-  // ✅ ESCAPE POINT
-  if (doorUnlocked) {
-    const escapeDist = player.position.distanceTo(escapePoint);
-    if (escapeDist < 20) {
-      showVictory();
-    }
-  }
-
-  if (!nearItem) {
-    interactionText.style.display = "none";
-  }
-}
-
-// ✅ INTERACTION HANDLER - IMPROVED
-function handleInteraction() {
-  const interactionRange = 5;
-
-  // ✅ PICK UP KEY
-  if (keyPickup && !inventory.key) {
-    if (player.position.distanceTo(keyPickup.position) < interactionRange) {
-      inventory.key = true;
-      scene.remove(keyPickup);
-      playSound("key_pickup");
-      updateObjective(1);
-      updateInventoryUI();
-      return;
-    }
-  }
-
-  // ✅ UNLOCK DOOR WITH ANIMATION
-  if (mansionDoor && inventory.key && !doorUnlocked) {
-    if (player.position.distanceTo(mansionDoor.position) < interactionRange) {
-      doorUnlocked = true;
-      colliders = colliders.filter((col) => col.id !== mansionDoor.uuid);
-      playSound("door_open");
-      updateObjective(2);
-      
-      // ✅ DOOR OPENING ANIMATION
-      let angle = 0;
-      const animateOpen = setInterval(() => {
-        angle += 0.1;
-        mansionDoor.rotation.y = angle;
-        if (angle >= Math.PI / 2) {
-          clearInterval(animateOpen);
-          doorOpen = true;
+        if(dist < col.r + 2) {
+            player.position.copy(oldPos);
         }
-      }, 30);
-      
-      updateInventoryUI();
-      return;
     }
-  }
 
-  // ✅ READ NOTES
-  for (let i = 0; i < notesInWorld.length; i++) {
-    const note = notesInWorld[i];
-    if (player.position.distanceTo(note.position) < interactionRange) {
-      alert("NOTE: " + note.userData.text);
-      inventory.notesCollected++;
-      notesInWorld.splice(i, 1);
-      scene.remove(note);
-      updateInventoryUI();
-      return;
+    if(player.position.distanceTo(lastPlayerPos) < 0.4) {
+        idleTimer += delta;
+    } else {
+        idleTimer = 0;
     }
-  }
+
+    lastPlayerPos.copy(player.position);
+
+    player.rotation.y = yaw;
+    camera.rotation.x = pitch;
 }
 
-// ✅ UPDATE OBJECTIVE
-function updateObjective(stage) {
-  objectiveStage = stage;
-  
-  const stages = [
-    "Find the Mansion Key",
-    "Reach the Mansion",
-    "Unlock the Door",
-    "Escape the Island"
-  ];
-  
-  currentObjective = stages[stage] || stages[0];
-  updateObjectiveUI();
-}
+function updateEnemy(delta) {
+    if(!enemy) return;
 
-// ✅ UPDATE INVENTORY UI
-function updateInventoryUI() {
-  const invKey = getEl("inventoryKey");
-  const invNotes = getEl("inventoryNotes");
+    let distance = enemy.position.distanceTo(player.position);
 
-  if (invKey) {
-    invKey.style.display = inventory.key ? "block" : "none";
-  }
-
-  if (invNotes) {
-    invNotes.innerText = "Notes: " + inventory.notesCollected;
-  }
-}
-
-function updateGravity(delta) {
-  player.position.y += velocityY * delta;
-  velocityY -= 20 * delta;
-
-  const groundY = getTerrainHeight(player.position.x, player.position.z);
-  const floorY = groundY + playerHeight;
-
-  if (player.position.y <= floorY) {
-    player.position.y = floorY;
-    velocityY = 0;
-    isJumping = false;
-  }
-}
-
-function handleCollisions() {
-  const radius = 2.1;
-
-  for (const col of colliders) {
-    const dx = player.position.x - col.x;
-    const dz = player.position.z - col.z;
-    const distSq = dx * dx + dz * dz;
-    const minDist = radius + col.r;
-
-    if (distSq < minDist * minDist) {
-      player.position.x = lastSafePosition.x;
-      player.position.z = lastSafePosition.z;
-      return;
+    if(distance < 3) {
+        alert("GAME OVER");
+        gameOver = true;
+        return;
     }
-  }
-}
 
-function avoidEnemyHardClip() {
-  for (const col of colliders) {
-    const dx = enemy.position.x - col.x;
-    const dz = enemy.position.z - col.z;
-    const distSq = dx * dx + dz * dz;
-    const minDist = 2.3 + col.r;
-
-    if (distSq < minDist * minDist) {
-      const dist = Math.sqrt(distSq) || 0.01;
-      enemy.position.x = col.x + (dx / dist) * minDist;
-      enemy.position.z = col.z + (dz / dist) * minDist;
+    if(idleTimer >= 6) {
+        enemyState = "chase";
     }
-  }
+
+    if(enemyState === "patrol") {
+        patrolEnemy(delta);
+    }
+
+    if(enemyState === "chase") {
+        chaseEnemy(delta);
+    }
 }
 
-function addCylinderCollider(x, z, r) {
-  colliders.push({ x, z, r });
+function patrolEnemy(delta) {
+    let dir = new THREE.Vector3()
+        .subVectors(enemyTarget, enemy.position);
+
+    if(dir.length() < 2) {
+        pickEnemyTarget();
+        return;
+    }
+
+    dir.normalize();
+    moveEnemy(dir, delta);
 }
 
-function addBoxCollider(mesh) {
-  const box = new THREE.Box3().setFromObject(mesh);
-  const size = new THREE.Vector3();
-  const center = new THREE.Vector3();
-  box.getSize(size);
-  box.getCenter(center);
-  colliders.push({
-    id: mesh.uuid,
-    x: center.x,
-    z: center.z,
-    r: Math.max(size.x, size.z) * 0.5
-  });
+function chaseEnemy(delta) {
+    let dir = new THREE.Vector3()
+        .subVectors(player.position, enemy.position);
+
+    dir.normalize();
+    moveEnemy(dir, delta);
 }
 
-function triggerJumpscare() {
-  jumpscareStarted = true;
-  paused = true;
+function moveEnemy(dir, delta) {
+    let nextX = enemy.position.x + dir.x * ENEMY_SPEED * delta;
+    let nextZ = enemy.position.z + dir.z * ENEMY_SPEED * delta;
 
-  if (document.exitPointerLock) document.exitPointerLock();
+    let blocked = false;
 
-  camera.lookAt(enemy.position.x, enemy.position.y + 7, enemy.position.z);
-  playSound("jumpscare");
+    for(let col of colliders) {
+        let dx = nextX - col.x;
+        let dz = nextZ - col.z;
+        let dist = Math.sqrt(dx*dx + dz*dz);
 
-  setTimeout(() => {
-    showGameOver();
-  }, 450);
+        if(dist < col.r + 2) {
+            blocked = true;
+            break;
+        }
+    }
+
+    if(!blocked) {
+        enemy.position.x = nextX;
+        enemy.position.z = nextZ;
+    }
+
+    enemy.lookAt(player.position.x, enemy.position.y, player.position.z);
 }
 
-function requestPointerControl() {
-  if (!paused && gameStarted && document.body.requestPointerLock) {
-    document.body.requestPointerLock();
-  }
-}
-
-function handleMouseLook(e) {
-  if (document.pointerLockElement !== document.body || paused) return;
-
-  yaw -= e.movementX * mouseSensitivity;
-  pitch -= e.movementY * mouseSensitivity;
-  pitch = Math.max(-1.5, Math.min(1.5, pitch));
-}
-
-function handlePointerLockChange() {
-  if (document.pointerLockElement !== document.body && gameStarted) {
-    move.w = false;
-    move.a = false;
-    move.s = false;
-    move.d = false;
-    running = false;
-  }
-}
-
-function setupMobileUiButtons() {
-  const runBtn = getEl("runBtn");
-
-  if (runBtn) {
-    runBtn.addEventListener("touchstart", (e) => {
-      e.preventDefault();
-      running = true;
-    });
-    runBtn.addEventListener("touchend", (e) => {
-      e.preventDefault();
-      running = false;
-    });
-    runBtn.addEventListener("mousedown", () => running = true);
-    runBtn.addEventListener("mouseup", () => running = false);
-    runBtn.addEventListener("mouseleave", () => running = false);
-  }
-}
-
-function createMobileControls() {
-  if (mobileControlsCreated) return;
-  mobileControlsCreated = true;
-
-  const joy = document.createElement("div");
-  joy.style.cssText = `
-    position: absolute;
-    left: 40px;
-    bottom: 40px;
-    width: 120px;
-    height: 120px;
-    border-radius: 50%;
-    background: rgba(255,255,255,0.25);
-    border: 2px solid rgba(255,255,255,0.5);
-    z-index: 999;
-    touch-action: none;
-  `;
-  document.body.appendChild(joy);
-
-  let startX = 0;
-  let startY = 0;
-
-  joy.addEventListener("touchstart", (e) => {
-    e.preventDefault();
-    joystick.active = true;
-    startX = e.touches[0].clientX;
-    startY = e.touches[0].clientY;
-  });
-
-  joy.addEventListener("touchmove", (e) => {
-    e.preventDefault();
-    joystick.dx = e.touches[0].clientX - startX;
-    joystick.dy = e.touches[0].clientY - startY;
-  });
-
-  joy.addEventListener("touchend", () => {
-    joystick.active = false;
-    joystick.dx = 0;
-    joystick.dy = 0;
-  });
-
-  const jumpBtn = document.createElement("button");
-  jumpBtn.innerHTML = "JUMP";
-  jumpBtn.style.cssText = `
-    position: absolute;
-    right: 40px;
-    bottom: 60px;
-    width: 90px;
-    height: 90px;
-    border-radius: 50%;
-    font-size: 18px;
-    z-index: 999;
-    touch-action: none;
-  `;
-  document.body.appendChild(jumpBtn);
-
-  jumpBtn.addEventListener("touchstart", (e) => {
-    e.preventDefault();
-    jump();
-  });
-}
-
-function jump() {
-  if (!isJumping && !paused) {
-    velocityY = 7;
-    isJumping = true;
-    playSound("footstep");
-    lastPlayerSound = { time: Date.now(), type: "jump" };
-  }
-}
-
-function keyDown(e) {
-  const key = e.key.toLowerCase();
-
-  if (key === "w") move.w = true;
-  if (key === "a") move.a = true;
-  if (key === "s") move.s = true;
-  if (key === "d") move.d = true;
-  if (key === "shift") running = true;
-  if (e.code === "Space") jump();
-  if (key === "f") toggleTorch();
-  if (key === "p") togglePause();
-  if (key === "e") handleInteraction();
-}
-
-function keyUp(e) {
-  const key = e.key.toLowerCase();
-
-  if (key === "w") move.w = false;
-  if (key === "a") move.a = false;
-  if (key === "s") move.s = false;
-  if (key === "d") move.d = false;
-  if (key === "shift") running = false;
-}
-
-function togglePause() {
-  paused = !paused;
-
-  const pauseBtn = getEl("pauseBtn");
-  if (pauseBtn) pauseBtn.innerHTML = paused ? "Play" : "Pause";
-
-  if (paused && document.exitPointerLock) {
-    document.exitPointerLock();
-  } else {
-    requestPointerControl();
-  }
-}
-
-function toggleTorch() {
-  // ✅ TORCH ALWAYS ON - NO BATTERY DRAIN
-  torchOn = !torchOn;
-  if (torchLight) torchLight.intensity = torchOn ? 9 : 0;
-
-  const torchBtn = getEl("torchBtn");
-  if (torchBtn) torchBtn.innerHTML = torchOn ? "Torch ON" : "Torch OFF";
-}
-
-function updateHealthUI() {
-  const healthValue = getEl("healthValue");
-  const healthFill = getEl("healthFill");
-
-  if (healthValue) healthValue.innerText = Math.ceil(health);
-  if (healthFill) healthFill.style.width = health + "%";
-
-  if (health < 30) {
-    const gameUI = getEl("gameUI");
-    if (gameUI) gameUI.classList.add("low-health");
-  } else {
-    const gameUI = getEl("gameUI");
-    if (gameUI) gameUI.classList.remove("low-health");
-  }
-}
-
-// ✅ STAMINA UI
-function updateStaminaUI() {
-  const staminaFill = getEl("staminaFill");
-  if (staminaFill) staminaFill.style.width = stamina + "%";
-}
-
-// ✅ BATTERY UI - NO DRAIN (unlimited torch)
-function updateBatteryUI() {
-  const torchIndicator = getEl("torchIndicator");
-  if (torchIndicator) {
-    torchIndicator.innerText = torchOn ? "Torch: ON (∞)" : "Torch: OFF (∞)";
-  }
-}
-
-// ✅ OBJECTIVE UI
-function updateObjectiveUI() {
-  const objectiveText = getEl("objectiveText");
-  if (objectiveText) objectiveText.innerText = currentObjective;
-}
-
-function damagePlayer(amount) {
-  health = Math.max(0, health - amount);
-  updateHealthUI();
-  if (health <= 0) showGameOver();
-}
-
-function showGameOver() {
-  paused = true;
-  showEl("gameUI", "none");
-  showEl("gameOver", "flex");
-  if (document.exitPointerLock) document.exitPointerLock();
-}
-
-// ✅ IMPROVED VICTORY SCREEN WITH CUTSCENE
-function showVictory() {
-  paused = true;
-  showEl("gameUI", "none");
-  showEl("victory", "flex");
-  if (document.exitPointerLock) document.exitPointerLock();
-
-  // ✅ PLAY VICTORY CUTSCENE
-  playSound("door_open");
-  
-  // Final ghost appearance
-  setTimeout(() => {
-    playSound("jumpscare");
-    alert("You escaped... but it follows you still...");
-  }, 2000);
-}
-
-function restartGame() {
-  location.reload();
-}
-
-function backToMenu() {
-  location.reload();
-}
-
-function onResize() {
-  camera.aspect = window.innerWidth / window.innerHeight;
-  camera.updateProjectionMatrix();
-  renderer.setSize(window.innerWidth, window.innerHeight);
+function pickEnemyTarget() {
+    enemyTarget.set(
+        Math.random() * 100 - 50,
+        0,
+        Math.random() * 100 - 50
+    );
 }
 
 function animate() {
-  requestAnimationFrame(animate);
+    requestAnimationFrame(animate);
 
-  if (!player || !renderer || !scene || !camera) return;
+    if(gameOver) return;
 
-  const delta = Math.min(clock.getDelta(), 0.05);
-
-  if (!paused) {
-    if (enemyMixer) enemyMixer.update(delta);
+    let delta = clock.getDelta();
 
     updatePlayer(delta);
-    updateGravity(delta);
-    updateEnemyAI(delta);
-    updateHorrorEvents(delta);
-    handleCollisions();
-    updateStaminaUI();
-    updateBatteryUI();
 
-    // ✅ RENDER SHADOW FIGURE IF VISIBLE
-    if (shadowFigure && shadowFigure.userData.visible) {
-      shadowFigure.visible = true;
-    } else if (shadowFigure) {
-      shadowFigure.visible = false;
-    }
-  }
+    if(enemyMixer) enemyMixer.update(delta);
 
-  renderer.render(scene, camera);
+    updateEnemy(delta);
+
+    renderer.render(scene, camera);
 }
 
-function createBrokenCar() {
+function keyDown(e) {
+    let key = e.key.toLowerCase();
 
-    console.log("createBrokenCar called");
-
-    const loader = createGLTFLoader();
-
-    loader.load(
-        "models/old_rusty_car.glb",
-
-        function (gltf) {
-
-            brokenCar = gltf.scene;
-
-            brokenCar.scale.set(1.5, 1.5, 1.5);
-
-            brokenCar.position.set(
-                0,
-                getTerrainHeight(0, -180),
-                -180
-            );
-
-            brokenCar.rotation.y = Math.PI;
-
-            scene.add(brokenCar);
-
-            console.log("Rusty Car Loaded");
-        },
-
-        undefined,
-
-        function (error) {
-            console.error("Car Error:", error);
-        }
-    );
+    if(key === "w") move.w = true;
+    if(key === "a") move.a = true;
+    if(key === "s") move.s = true;
+    if(key === "d") move.d = true;
 }
+
+function keyUp(e) {
+    let key = e.key.toLowerCase();
+
+    if(key === "w") move.w = false;
+    if(key === "a") move.a = false;
+    if(key === "s") move.s = false;
+    if(key === "d") move.d = false;
+}
+
+function mouseLook(e) {
+    yaw -= e.movementX * 0.002;
+    pitch -= e.movementY * 0.002;
+
+    pitch = Math.max(-1.5, Math.min(1.5, pitch));
+}
+
+window.addEventListener("resize", () => {
+    camera.aspect = window.innerWidth / window.innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(window.innerWidth, window.innerHeight);
+});
