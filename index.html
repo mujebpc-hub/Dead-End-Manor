@@ -7,228 +7,116 @@
 <title>MAZE OF THE WATCHER</title>
 
 <link rel="stylesheet" href="style.css">
-
-<style>
-*{
-margin:0;
-padding:0;
-box-sizing:border-box;
-}
-
-body{
-overflow:hidden;
-font-family:Arial,sans-serif;
-background:#87CEEB;
-}
-
-canvas{
-display:block;
-}
-
-.screen{
-position:absolute;
-top:0;
-left:0;
-width:100%;
-height:100%;
-display:flex;
-justify-content:center;
-align-items:center;
-flex-direction:column;
-background:linear-gradient(to bottom,#87CEEB,#ffffff);
-z-index:100;
-text-align:center;
-}
-
-.hidden{
-display:none;
-}
-
-h1{
-font-size:60px;
-color:#111;
-margin-bottom:20px;
-letter-spacing:3px;
-}
-
-h2{
-font-size:30px;
-margin-bottom:20px;
-}
-
-p{
-max-width:650px;
-font-size:18px;
-line-height:1.6;
-margin-bottom:20px;
-color:#333;
-}
-
-button{
-padding:15px 30px;
-margin:10px;
-border:none;
-background:#111;
-color:white;
-font-size:18px;
-cursor:pointer;
-border-radius:8px;
-transition:0.3s;
-}
-
-button:hover{
-background:#333;
-}
-
-#gameUI{
-position:absolute;
-top:0;
-left:0;
-width:100%;
-height:100%;
-pointer-events:none;
-display:none;
-z-index:20;
-}
-
-#levelBox{
-position:absolute;
-top:20px;
-left:20px;
-font-size:24px;
-font-weight:bold;
-color:white;
-text-shadow:2px 2px 5px black;
-}
-
-#objectiveBox{
-position:absolute;
-top:20px;
-left:50%;
-transform:translateX(-50%);
-font-size:20px;
-color:white;
-text-shadow:2px 2px 5px black;
-}
-
-#crosshair{
-position:absolute;
-left:50%;
-top:50%;
-transform:translate(-50%,-50%);
-font-size:35px;
-color:white;
-}
-
-#gameOver h1{
-color:red;
-}
-
-#victory h1{
-color:green;
-}
-</style>
 </head>
 
 <body>
 
-<!-- HOME SCREEN -->
+<!-- HOME -->
 <div id="home" class="screen">
-<h1>MAZE OF THE WATCHER</h1>
+    <h1>MAZE OF THE WATCHER</h1>
 
-<p>
-You wake up trapped inside a mysterious maze.
-Every path leads deeper into darkness.
-The Watcher is hunting you.
-Find the exit.
-Survive each level.
-Escape the maze before it finds you.
-</p>
+    <p>
+        You wake up trapped inside a mysterious maze.
+        Every path leads deeper into darkness.
+        The Watcher is hunting you.
+        Find the exit.
+        Survive each level.
+        Escape before it finds you.
+    </p>
 
-<button onclick="startGame()">START JOURNEY</button>
-<button onclick="showStory()">STORY</button>
-<button onclick="showCredits()">CREDITS</button>
+    <button onclick="startGame()">START JOURNEY</button>
+    <button onclick="showStory()">STORY</button>
+    <button onclick="showCredits()">CREDITS</button>
 </div>
 
-<!-- STORY SCREEN -->
+<!-- STORY -->
 <div id="story" class="screen hidden">
-<h2>THE STORY</h2>
+    <h2>THE STORY</h2>
 
-<p>
-Long ago, this maze was built to trap lost souls.
-Nobody escaped.
-Now you are inside it.
-Each level becomes harder.
-Each enemy becomes smarter.
-The only way out is forward.
-There is no turning back.
-</p>
+    <p>
+        Long ago, this maze was built to trap lost souls.
+        Nobody escaped.
+        Now you are inside it.
+        Each level becomes harder.
+        Each enemy becomes smarter.
+        The only way out is forward.
+        There is no turning back.
+    </p>
 
-<button onclick="goHome()">BACK</button>
+    <button onclick="goHome()">BACK</button>
 </div>
 
 <!-- LOADING -->
 <div id="loading" class="screen hidden">
-<h2>Loading Level...</h2>
+    <h2>Loading Level...</h2>
 </div>
 
 <!-- GAME UI -->
-<div id="gameUI">
-<div id="levelBox">LEVEL 1</div>
-<div id="objectiveBox">Find the Exit</div>
-<div id="crosshair">+</div>
+<div id="gameUI" style="display:none;">
+    <div id="levelBox">LEVEL 1</div>
+    <div id="objectiveBox">Find the Exit</div>
+    <div id="crosshair">+</div>
 </div>
 
 <!-- GAME OVER -->
 <div id="gameOver" class="screen hidden">
-<h1>GAME OVER</h1>
-<p>The Watcher caught you.</p>
+    <h1>GAME OVER</h1>
+    <p>The Watcher caught you.</p>
 
-<button onclick="restartGame()">RETRY</button>
-<button onclick="goHome()">MAIN MENU</button>
+    <button onclick="restartGame()">RETRY</button>
+    <button onclick="goHome()">MAIN MENU</button>
 </div>
 
 <!-- VICTORY -->
 <div id="victory" class="screen hidden">
-<h1>YOU ESCAPED</h1>
-<p>You survived all maze levels.</p>
+    <h1>YOU ESCAPED</h1>
+    <p>You survived all maze levels.</p>
 
-<button onclick="restartGame()">PLAY AGAIN</button>
+    <button onclick="restartGame()">PLAY AGAIN</button>
 </div>
 
+<!-- THREE JS -->
 <script src="https://cdn.jsdelivr.net/npm/three@0.158/build/three.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.158/examples/js/loaders/GLTFLoader.js"></script>
 
+<!-- GAME SCRIPT -->
+<script src="game.js"></script>
+
+<!-- UI LOGIC -->
 <script>
-function startGame(){
-  document.body.requestPointerLock();
-document.getElementById("home").classList.add("hidden");
-document.getElementById("loading").classList.remove("hidden");
+function startGame() {
+    document.getElementById("home").classList.add("hidden");
+    document.getElementById("story").classList.add("hidden");
+    document.getElementById("loading").classList.remove("hidden");
 
-setTimeout(()=>{
-document.getElementById("loading").classList.add("hidden");
-document.getElementById("gameUI").style.display="block";
+    document.body.requestPointerLock();
 
-init();
-animate();
-},1500);
+    setTimeout(() => {
+        document.getElementById("loading").classList.add("hidden");
+        document.getElementById("gameUI").style.display = "block";
+
+        init();
+        animate();
+    }, 1500);
 }
 
-function goHome(){
-location.reload();
+function restartGame() {
+    location.reload();
 }
 
-function showStory(){
-document.getElementById("home").classList.add("hidden");
-document.getElementById("story").classList.remove("hidden");
+function goHome() {
+    location.reload();
 }
 
-function showCredits(){
-alert("Created by Mujeb Khan");
+function showStory() {
+    document.getElementById("home").classList.add("hidden");
+    document.getElementById("story").classList.remove("hidden");
+}
+
+function showCredits() {
+    alert("Created by Mujeb Khan");
 }
 </script>
-
-<script src="game.js"></script>
 
 </body>
 </html>
